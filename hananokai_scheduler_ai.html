@@ -373,20 +373,20 @@ body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Meiry
   .layout { flex-direction: column; padding: 8px; gap: 8px; min-height: 0; }
   .stats-panel { width: 100%; }
 
-  .calendar-grid { gap: 3px; }
-  .day-cell { min-height: 0; padding: 4px; }
+  .calendar-grid { gap: 4px; }
+  .day-cell { min-height: 0; padding: 5px; }
   .day-num { font-size: 15px; }
   .weekday-label { font-size: 13px; padding: 5px; }
 
-  .slot { padding: 4px 5px; }
+  .slot { padding: 5px 6px; }
   .slot-header { font-size: 11px; }
-  .members-row { min-height: 34px; gap: 5px; }
+  .members-row { min-height: 36px; gap: 5px; }
 
   /* チップ・追加ボタンのタップ領域をスマホ向けに拡大。
      ホバーでしか出ない削除ボタンはタッチでは操作できないため常時表示にする */
-  .chip { font-size: 15px; padding: 6px 8px 6px 10px; min-height: 32px; cursor: default; }
-  .chip .remove { opacity: 0.55; font-size: 18px; padding: 2px 4px; }
-  .add-slot-btn { padding: 6px 10px; font-size: 13px; min-height: 32px; }
+  .chip { font-size: 14px; padding: 7px 9px 7px 11px; min-height: 36px; cursor: default; }
+  .chip .remove { opacity: 0.6; font-size: 18px; padding: 2px 4px; }
+  .add-slot-btn { padding: 8px 10px; font-size: 15px; min-height: 36px; width: 100%; font-weight: bold; border-style: solid; border-color: #bbb; color: #888; }
 
   /* モーダルはスマホでは画面下からのシート表示にして親指で操作しやすくする */
   .modal-overlay.open { align-items: flex-end; justify-content: center; }
@@ -395,45 +395,6 @@ body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Meiry
   .review-modal { width: 100%; max-width: 100%; max-height: 88vh; border-radius: 16px 16px 0 0; }
 
   .notices-section { margin: 6px 8px 8px; }
-}
-
-/* ===== スマホ（狭い画面）向け：カレンダーを7列表→1列の縦リストに変更 =====
-   7列のままだと1マスが小さくなりすぎてタップしづらいという声があったため、
-   スマホ幅では1日=1行のリスト形式にして、日付・曜日を大きく見やすくする。
-   PC・タブレット向けの7列レイアウトはそのまま残す。 */
-@media (max-width: 600px) {
-  .weekdays { display: none; }
-  .calendar-grid { grid-template-columns: 1fr; gap: 10px; }
-  .day-cell.empty-cell { display: none; }
-
-  .day-cell { padding: 12px 14px; border-radius: 12px; min-height: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-  .day-cell.today { border-width: 2px; }
-
-  .day-header { margin-bottom: 8px; }
-  .day-num { font-size: 22px; }
-  .day-num::after { font-size: 14px; font-weight: normal; margin-left: 8px; color: #888; }
-  .day-cell[data-dow="0"] .day-num::after { content: "（日）"; color: #c00; }
-  .day-cell[data-dow="1"] .day-num::after { content: "（月）"; }
-  .day-cell[data-dow="2"] .day-num::after { content: "（火）"; }
-  .day-cell[data-dow="3"] .day-num::after { content: "（水）"; }
-  .day-cell[data-dow="4"] .day-num::after { content: "（木）"; }
-  .day-cell[data-dow="5"] .day-num::after { content: "（金）"; }
-  .day-cell[data-dow="6"] .day-num::after { content: "（土）"; color: #2a5ba8; }
-  .day-toggle { font-size: 20px !important; padding: 4px 8px !important; }
-
-  .slot { padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; }
-  .slot-header { font-size: 14px; margin-bottom: 6px; }
-  .slot-label { font-size: 14px; }
-  .slot-info { font-size: 12px; }
-  .slot-lock { font-size: 16px; }
-  .members-row { min-height: 42px; gap: 8px; }
-
-  .chip { font-size: 17px; padding: 9px 12px 9px 14px; min-height: 40px; border-radius: 20px; }
-  .chip .remove { font-size: 20px; }
-  .add-slot-btn { padding: 9px 14px; font-size: 15px; min-height: 40px; border-radius: 12px; }
-
-  /* 日付ジャンプしやすいよう、月移動の下に現在の月を大きく表示 */
-  .month-nav input[type="month"] { font-size: 15px; padding: 6px 10px; }
 }
 
 /* ===== Gemini 相談パネル（フローティングボタン＋ドロワー） ===== */
