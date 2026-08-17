@@ -1,0 +1,3702 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="花の会予定表AI">
+<meta name="theme-color" content="#2c5f2e">
+<title>花の会 作業予定表（スマホ対応・AI配置版）</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; font-size: 13px; background: #f0f2f5; color: #333; }
+
+/* ===== HEADER ===== */
+.header { background: #2c5f2e; color: white; padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.header h1 { font-size: 26px; font-weight: bold; letter-spacing: 0.5px; }
+.month-nav { display: flex; align-items: center; gap: 6px; }
+.month-nav button { background: rgba(255,255,255,0.2); border: none; color: white; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 16px; line-height: 1; transition: background 0.2s; }
+.month-nav button:hover { background: rgba(255,255,255,0.35); }
+.month-nav input[type="month"] { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35); color: white; padding: 4px 8px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; outline: none; min-width: 130px; text-align: center; }
+.month-nav input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+.month-nav input[type="month"]:focus { border-color: #f0a500; }
+.header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.btn { padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
+.btn-auto { background: #f0a500; color: white; }
+.btn-auto:hover { background: #d4900a; }
+.btn-clear { background: #a83030; color: white; }
+.btn-clear:hover { background: #8a2626; }
+.btn-print { background: #4a9eda; color: white; }
+.btn-print:hover { background: #3a8eca; }
+.btn-save { background: #6a4a9e; color: white; }
+.btn-save:hover { background: #5a3a8e; }
+.btn-load { background: #8a6a20; color: white; }
+.btn-load:hover { background: #7a5a10; }
+.btn-image { background: #2a7a6e; color: white; }
+.btn-image:hover { background: #1a6a5e; }
+.btn-image:disabled { opacity: 0.6; cursor: default; }
+
+/* ===== LEGEND ===== */
+.legend { background: white; padding: 6px 16px; display: flex; gap: 20px; align-items: center; font-size: 11px; border-bottom: 1px solid #e0e0e0; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+.legend-dot.am { background: #ffd4d4; border: 1px solid #ffaaaa; }
+.legend-dot.pm { background: #d4e4ff; border: 1px solid #aaccff; }
+.legend-dot.pending { background: repeating-linear-gradient(45deg, #fff8e1, #fff8e1 3px, #f0a500 3px, #f0a500 6px); border: 1px solid #f0a500; }
+
+/* ===== MAIN LAYOUT ===== */
+.layout { display: flex; gap: 10px; padding: 10px; min-height: calc(100vh - 80px); }
+
+/* ===== CALENDAR PANEL ===== */
+.calendar-panel { flex: 1; min-width: 0; }
+.weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 3px; }
+.weekday-label { text-align: center; font-size: 17px; font-weight: bold; padding: 7px; background: #2c5f2e; color: white; border-radius: 4px; }
+.weekday-label.sat { background: #2a5ba8; }
+.weekday-label.sun { background: #a83030; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+
+/* Day cell */
+.day-cell { background: white; border-radius: 6px; padding: 5px; min-height: 90px; border: 1px solid #e0e0e0; transition: border-color 0.2s; }
+.day-cell:hover { border-color: #bbb; }
+.day-cell.workday-drag-over { outline: 2px dashed #2c5f2e; background: #eaf6ea; }
+.day-cell.today { border: 2px solid #f0a500; }
+.day-cell.empty-cell { background: transparent; border: none; min-height: 0; }
+.day-cell.weekend { background: #fafafa; }
+/* 月・水・金を薄い黄色で目立たせる */
+.day-cell.mwf { background: #fffbe0; }
+.day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.day-num { font-weight: bold; font-size: 18px; padding: 1px 4px; border-radius: 4px; }
+.day-num.sat { color: #2a5ba8; }
+.day-num.sun { color: #c00; }
+.day-num.holiday { color: #c00; }
+.day-today-mark { background: #f0a500; color: white !important; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Slot */
+.slot { border-radius: 4px; padding: 3px 4px; margin-bottom: 2px; transition: background 0.15s; }
+.slot.am { background: #fff5f5; border-left: 3px solid #c00; }
+.slot.pm { background: #f0f5ff; border-left: 3px solid #2a5ba8; }
+.slot.drag-over { outline: 2px dashed #f0a500; background: #fffde7; }
+.slot-header { display: flex; align-items: center; gap: 3px; font-size: 10px; font-weight: bold; margin-bottom: 2px; flex-wrap: wrap; }
+/* 印刷時に「午前」「午後」の2文字が縦に折り返されてしまう不具合があった。
+   flexコンテナの幅が足りないとき、デフォルトではラベルのspanが文字幅未満に
+   縮められ、中の文字自体が折り返されてしまうため、縮まない・折り返さないよう
+   明示的に指定する（万一それでも入り切らない場合は、文字を割るのではなく
+   slot-header側のflex-wrapでラベルごと次の行に送る）。 */
+.slot-label { font-size: 10px; font-weight: bold; white-space: nowrap; flex-shrink: 0; }
+.slot-label.am { color: #c00; }
+.slot-info { white-space: nowrap; flex-shrink: 0; }
+.slot-lock, .slot-remove-day { flex-shrink: 0; }
+.slot-label.pm { color: #2a5ba8; }
+.slot-info { font-size: 9px; color: #999; }
+.slot-lock { cursor: pointer; font-size: 11px; margin-left: auto; opacity: 0.35; user-select: none; }
+.slot-lock:hover { opacity: 0.8; }
+.slot-lock.locked { opacity: 1; color: #f0a500; }
+.slot-remove-day { cursor: pointer; font-size: 11px; margin-left: 4px; opacity: 0.3; user-select: none; color: #a83030; }
+.slot-remove-day:hover { opacity: 0.9; }
+.slot-restore-btn { width: 100%; margin-bottom: 2px; }
+.members-row { display: flex; flex-wrap: wrap; gap: 4px; min-height: 32px; }
+
+/* Chip */
+/* 名前チップの文字が小さくて読みにくいという声があったため、画面表示では
+   もとの約2倍のサイズにしている（元は font-size:11px, padding:1px 5px 1px 4px）。 */
+.chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 10px 2px 8px; border-radius: 16px; font-size: 22px; cursor: grab; user-select: none; white-space: nowrap; transition: opacity 0.15s; }
+.chip:active { cursor: grabbing; opacity: 0.6; }
+.chip.am { background: #ffd4d4; color: #8b0000; border: 1px solid #ffaaaa; }
+.chip.pm { background: #d4e4ff; color: #00348b; border: 1px solid #aaccff; }
+.chip.pending { border-style: dashed; }
+.chip .pending-icon { font-size: 16px; }
+.chip .remove { cursor: pointer; opacity: 0; font-size: 20px; margin-left: 2px; transition: opacity 0.15s; line-height: 1; }
+.chip:hover .remove { opacity: 0.7; }
+.chip .remove:hover { opacity: 1; }
+
+/* Add button */
+.add-slot-btn { background: none; border: 1px dashed #ccc; color: #aaa; cursor: pointer; border-radius: 10px; padding: 1px 7px; font-size: 11px; transition: all 0.15s; }
+.add-slot-btn:hover { border-color: #888; color: #666; }
+
+/* ===== STATS PANEL ===== */
+.stats-panel { width: 250px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+.stats-card { background: white; border-radius: 8px; padding: 12px; border: 1px solid #e0e0e0; }
+.stats-card h3 { font-size: 12px; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.stats-card h3 .icon { font-size: 14px; }
+
+/* Member stat row */
+.member-stat { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
+.m-name { font-size: 12px; width: 44px; font-weight: 500; }
+.m-role { font-size: 9px; padding: 1px 4px; border-radius: 8px; width: 36px; text-align: center; flex-shrink: 0; }
+.m-bar-wrap { flex: 1; background: #eee; border-radius: 3px; height: 7px; overflow: hidden; }
+.m-bar { height: 100%; background: #2c5f2e; border-radius: 3px; transition: width 0.4s ease; min-width: 2px; }
+.m-count { font-size: 11px; color: #666; width: 28px; text-align: right; }
+
+/* Ratio display */
+.ratio-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.ratio-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+
+/* Warnings */
+.warnings-list { display: flex; flex-direction: column; gap: 4px; }
+.warn-item { padding: 5px 8px; border-radius: 4px; font-size: 11px; line-height: 1.4; }
+.warn-item.error { background: #ffe0e0; color: #b71c1c; border-left: 3px solid #c00; }
+.warn-item.warn { background: #fff8e1; color: #6d4c00; border-left: 3px solid #f0a500; }
+.warn-item.ok { background: #e8f5e9; color: #1b5e20; border-left: 3px solid #2c5f2e; }
+.no-warn { color: #aaa; font-size: 12px; text-align: center; padding: 10px 0; }
+
+/* ===== MODAL ===== */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; }
+.modal-overlay.open { display: flex; align-items: center; justify-content: center; }
+.modal { background: white; border-radius: 12px; padding: 20px; min-width: 270px; max-width: 340px; box-shadow: 0 10px 40px rgba(0,0,0,0.25); }
+.modal h3 { font-size: 14px; margin-bottom: 6px; }
+.modal-sub { font-size: 11px; color: #888; margin-bottom: 12px; }
+.modal-list { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.modal-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+.modal-row:hover { background: #f0f0f0; }
+.modal-row.unavailable { opacity: 0.35; cursor: not-allowed; }
+.modal-row.unavailable:hover { background: none; }
+.modal-row.already { background: #e8f5e9; cursor: default; }
+.modal-row .m-name { width: auto; flex: 1; }
+.modal-row .m-pref { font-size: 10px; color: #888; }
+.modal-row .m-status { font-size: 10px; }
+.m-delete { cursor: pointer; opacity: 0.35; font-size: 13px; margin-left: 4px; flex-shrink: 0; }
+.m-delete:hover { opacity: 0.9; }
+.modal-close { margin-top: 12px; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; color: #666; }
+.modal-close:hover { background: #f5f5f5; }
+.modal-freetext { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
+.modal-freetext input { flex: 1; min-width: 0; padding: 7px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
+.modal-freetext button { flex-shrink: 0; padding: 7px 12px; font-size: 12px; }
+
+/* ===== 解析結果レビューモーダル（画面いっぱいに大きく・ちゃんとスクロールできる） ===== */
+.review-modal { max-width: 640px; width: 92vw; max-height: 84vh; display: flex; flex-direction: column; }
+.review-modal-body { overflow-y: auto; flex: 1; margin: 8px 0 14px; padding-right: 6px; }
+.review-modal-actions { display: flex; gap: 8px; }
+.review-modal-actions .modal-close { margin-top: 0; flex: 1; }
+.review-apply-btn { flex: 2; padding: 9px; border: none; border-radius: 6px; background: #2c5f2e; color: white; font-weight: bold; cursor: pointer; font-size: 13px; }
+.review-apply-btn:hover { background: #3a7a3c; }
+.review-member-card { border: 1px solid #eee; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.review-member-card.is-new { border-color: #f0a500; background: #fffaf0; }
+.review-member-card .rm-name { font-weight: bold; font-size: 13px; }
+.review-member-card .rm-new-badge { font-size: 10px; color: #f0a500; margin-left: 6px; font-weight: normal; }
+.review-member-card .rm-detail { font-size: 12px; color: #444; margin-top: 3px; line-height: 1.6; }
+.review-removed { background: #fff0f0; border-left: 3px solid #c00; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: #a00; margin-top: 6px; line-height: 1.6; }
+
+/* ===== SCREENSHOT PANEL ===== */
+.screenshot-panel { background: #1a1a2e; border-bottom: 2px solid #2c5f2e; padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.35s ease, padding 0.35s ease; }
+.screenshot-panel.open { max-height: 82vh; padding: 10px 14px; overflow-y: auto; }
+.screenshot-panel-inner { display: flex; flex-direction: column; gap: 8px; }
+.screenshot-panel-header { display: flex; align-items: center; gap: 10px; }
+.screenshot-panel-header span { color: #ccc; font-size: 12px; }
+.screenshot-panel-header .sc-clear { background: none; border: 1px solid #555; color: #aaa; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: auto; }
+.screenshot-panel-header .sc-clear:hover { border-color: #aaa; color: #ddd; }
+.paste-area { border: 2px dashed #4a6a8a; border-radius: 8px; padding: 14px; text-align: center; color: #7a9abf; font-size: 12px; background: rgba(255,255,255,0.04); cursor: text; min-height: 54px; outline: none; transition: border-color 0.2s, background 0.2s; }
+.paste-area:focus { border-color: #f0a500; background: rgba(240,165,0,0.07); color: #f5c842; }
+.paste-area.drag-over-zone { border-color: #f0a500; background: rgba(240,165,0,0.1); }
+.paste-area-icon { font-size: 20px; margin-bottom: 3px; }
+.paste-area-label { font-size: 12px; }
+.paste-area-hint { font-size: 10px; margin-top: 4px; opacity: 0; transition: opacity 0.2s; }
+.paste-area:focus .paste-area-hint { opacity: 1; }
+.sc-action-btns { display: flex; gap: 6px; margin-bottom: 4px; }
+.sc-file-btn { padding: 5px 12px; background: #2a4a6a; border: 1px solid #4a6a9a; color: #9abcdf; border-radius: 5px; cursor: pointer; font-size: 11px; }
+.sc-file-btn:hover { background: #3a5a7a; }
+.screenshot-gallery { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+.screenshot-gallery::-webkit-scrollbar { width: 10px; }
+.screenshot-gallery::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; }
+.screenshot-gallery::-webkit-scrollbar-thumb:hover { background: #777; }
+.screenshot-gallery::-webkit-scrollbar-track { background: #10182a; }
+/* Card layout */
+.sc-card { display: flex; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid #2a3a4a; border-radius: 8px; padding: 7px 8px; align-items: flex-start; }
+.sc-card-left { flex-shrink: 0; position: relative; }
+.sc-card-left img { height: 70px; width: auto; border-radius: 4px; cursor: pointer; object-fit: cover; display: block; }
+.sc-card-left img:hover { opacity: 0.85; }
+.sc-card-left .sc-del { position: absolute; top: -6px; right: -6px; background: #c00; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.sc-card-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.sc-card-name { font-size: 10px; color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-ocr-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+.sc-ocr-btn { padding: 3px 9px; background: #2a4a6a; border: none; color: #7abcff; border-radius: 4px; cursor: pointer; font-size: 11px; }
+.sc-ocr-btn:hover { background: #3a5a7a; }
+.sc-ocr-progress { font-size: 11px; color: #f0a500; }
+.sc-ocr-done { font-size: 10px; color: #4caf50; }
+.sc-ocr-text { width: 100%; min-height: 180px; max-height: 50vh; background: #111a2a; color: #cde; border: 1px solid #2a4060; border-radius: 4px; padding: 7px 9px; font-size: 12px; resize: vertical; font-family: inherit; line-height: 1.6; }
+.sc-ocr-text:focus { outline: none; border-color: #4a8abf; }
+.sc-parse-btn { padding: 3px 9px; background: #2c5f2e; border: none; color: #8fca91; border-radius: 4px; cursor: pointer; font-size: 11px; align-self: flex-start; }
+.sc-parse-btn:hover { background: #3a7a3c; }
+.sc-reminder { font-size: 10.5px; color: #9abcdf; line-height: 1.4; margin-top: 6px; }
+.sc-ocr-details { margin-top: 2px; }
+.sc-ocr-details summary { font-size: 11px; color: #9abcdf; cursor: pointer; padding: 2px 0; user-select: none; }
+.sc-ocr-details summary:hover { color: #c8ddf5; }
+.sc-ocr-details[open] summary { margin-bottom: 4px; }
+.sc-empty { color: #555; font-size: 12px; font-style: italic; padding: 4px 0; }
+.text-input-divider { text-align: center; color: #666; font-size: 11px; margin: 6px 0 2px; }
+.text-input-section { display: flex; flex-direction: column; gap: 6px; }
+.text-input-label { color: #ccc; font-size: 12px; }
+/* Lightbox */
+.lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 300; align-items: center; justify-content: center; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 6px; box-shadow: 0 0 60px rgba(0,0,0,0.8); }
+.lightbox-close { position: absolute; top: 16px; right: 20px; color: white; font-size: 30px; cursor: pointer; opacity: 0.8; background: none; border: none; }
+.lightbox-close:hover { opacity: 1; }
+.btn-sc { background: #3a5a6e; color: white; }
+.btn-sc:hover { background: #2a4a5e; }
+.btn-sc.active { background: #f0a500; }
+
+/* ===== セッション制バッジ ===== */
+.session-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; border: 2px solid; }
+.session-badge.mode1 { background: #e8f5e9; color: #1b5e20; border-color: #2c5f2e; }
+.session-badge.mode2 { background: #e3f2fd; color: #0d47a1; border-color: #1565c0; }
+.session-override { font-size: 11px; color: #888; cursor: pointer; text-decoration: underline; }
+.session-override:hover { color: #555; }
+
+/* ===== 作業日設定バー ===== */
+.workday-bar { background: white; border-bottom: 1px solid #e0e0e0; padding: 8px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.workday-bar label { font-size: 13px; font-weight: bold; color: #2c5f2e; white-space: nowrap; }
+.workday-input-wrap { display: flex; align-items: center; gap: 6px; }
+.workday-input { width: 60px; padding: 5px 8px; border: 2px solid #2c5f2e; border-radius: 6px; font-size: 15px; font-weight: bold; text-align: center; color: #2c5f2e; outline: none; }
+.workday-input:focus { border-color: #f0a500; }
+.workday-unit { font-size: 13px; color: #555; }
+.workday-apply-btn { padding: 5px 14px; background: #2c5f2e; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; }
+.workday-apply-btn:hover { background: #1e4220; }
+.workday-status { font-size: 12px; color: #666; margin-left: 4px; }
+.workday-status .wdc { font-weight: bold; color: #2c5f2e; }
+.workday-hint { font-size: 11px; color: #aaa; }
+/* Day cell active/inactive toggle */
+.day-cell.inactive { background: #f7f7f7; opacity: 0.55; }
+.day-cell.inactive .slot { display: none; }
+.day-cell .day-toggle { font-size: 10px; color: #ccc; cursor: pointer; user-select: none; padding: 0 2px; }
+.day-cell .day-toggle:hover { color: #888; }
+.day-cell.inactive .day-toggle { color: #bbb; }
+.day-cell.workday .day-num { text-decoration: underline; text-underline-offset: 2px; text-decoration-color: #2c5f2e; }
+
+/* ===== 連絡事項 ===== */
+.notices-section { background: white; border-radius: 8px; border: 1px solid #e0e0e0; padding: 12px 14px; margin: 8px 10px 10px; }
+.notices-section h4 { font-size: 13px; font-weight: bold; color: #2c5f2e; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.notices-section h4::before { content: ""; display: inline-block; width: 4px; height: 14px; background: #2c5f2e; border-radius: 2px; }
+.notices-textarea { width: 100%; min-height: 72px; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; font-size: 12px; font-family: inherit; resize: vertical; color: #333; line-height: 1.6; outline: none; transition: border-color 0.2s; }
+.notices-textarea:focus { border-color: #2c5f2e; }
+.notices-textarea::placeholder { color: #bbb; }
+
+/* ===== PRINT ===== */
+/* 以前は1ページに収めることだけを優先して文字をかなり小さく（7〜10px）
+   詰め込んでいたが、「文字が小さすぎる」という声を受けて文字は大きくした。
+   ただし月によって作業日数・セッション制（1回制/2回制）・配置人数が
+   まったく異なり、必要な高さも毎回変わるため、固定サイズのままでは
+   「必ずA4縦1枚に収まる」ことを保証できない。そこで、印刷直前（beforeprint）
+   に実際の内容の高さをJSで測定し、A4の使える高さに収まるよう文字サイズ
+   （--print-scale）を自動計算するようにした（computePrintScale関数）。
+   以下の数値は「縮小なし（scale=1）」のときの最大サイズで、実際に印刷する
+   ときは内容量に応じて自動的にこれより小さくなることがある。 */
+:root { --print-scale: 1; }
+@media print {
+  @page { size: A4 portrait; margin: 5mm; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body { height: auto !important; min-height: 0 !important; background: white; }
+  .header { background: #2c5f2e !important; padding: calc(6px * var(--print-scale)) calc(10px * var(--print-scale)); }
+  .header h1 { font-size: calc(29px * var(--print-scale)); }
+  .header-actions, .month-nav button, .add-slot-btn, .chip .remove, .slot-lock, .slot-remove-day, .slot-restore-btn, .legend, .stats-panel, .screenshot-panel, .workday-bar, .print-footer { display: none !important; }
+  /* .layout has a screen-only min-height: calc(100vh - 80px) that was forcing a full
+     viewport-height block during print, pushing the 連絡事項 section onto a 2nd page
+     even when the calendar itself easily fits on one page. Reset it for print. */
+  .layout { padding: 2px; gap: 0; min-height: 0 !important; }
+  .calendar-panel { width: 100%; }
+  .calendar-grid { gap: calc(2px * var(--print-scale)); }
+  .weekdays { margin-bottom: calc(4px * var(--print-scale)); }
+  .weekday-label { padding: calc(7px * var(--print-scale)); font-size: calc(25px * var(--print-scale)); font-weight: 700; }
+  .day-cell { min-height: 0; padding: calc(5px * var(--print-scale)); border: 1px solid #ccc; page-break-inside: avoid; }
+  .day-cell.mwf { background: #fffbe0 !important; }
+  .day-header { margin-bottom: calc(2px * var(--print-scale)); }
+  .day-num { font-size: calc(20px * var(--print-scale)); font-weight: 700; }
+  .day-toggle { display: none !important; }
+  .slot { padding: calc(3px * var(--print-scale)) calc(5px * var(--print-scale)); margin-bottom: calc(3px * var(--print-scale)); }
+  .slot-header { margin-bottom: calc(1px * var(--print-scale)); font-size: calc(15px * var(--print-scale)); font-weight: 700; gap: calc(4px * var(--print-scale)); }
+  .slot-info { font-size: calc(13px * var(--print-scale)); }
+  .members-row { min-height: calc(24px * var(--print-scale)); gap: calc(3px * var(--print-scale)); }
+  .chip { font-size: calc(22px * var(--print-scale)); font-weight: 700; padding: calc(2px * var(--print-scale)) calc(7px * var(--print-scale)) calc(2px * var(--print-scale)) calc(6px * var(--print-scale)); line-height: 1.3; }
+  .chip.am { background: #ffd4d4 !important; color: #8b0000 !important; }
+  .chip.pm { background: #d4e4ff !important; color: #00348b !important; }
+  .slot.am { background: #fff5f5 !important; }
+  .slot.pm { background: #f0f5ff !important; }
+  .weekday-label { background: #2c5f2e !important; }
+  .weekday-label.sat { background: #2a5ba8 !important; }
+  .weekday-label.sun { background: #a83030 !important; }
+  .notices-section { border: 1px solid #aaa !important; border-radius: 0 !important; margin: 3px 0 0 !important; padding: calc(7px * var(--print-scale)) calc(12px * var(--print-scale)); }
+  .notices-section h4 { font-size: calc(18px * var(--print-scale)); font-weight: 700; margin-bottom: calc(5px * var(--print-scale)); }
+  .notices-textarea { border: none !important; min-height: calc(40px * var(--print-scale)) !important; resize: none; padding: 4px 0 !important; white-space: pre-wrap; font-size: calc(17px * var(--print-scale)); line-height: 1.4; }
+}
+
+/* ===== PRINT MEASURE（印刷前の高さ測定専用。@media printではなく通常表示中に
+   一時的に付与するクラスなので、印刷用と全く同じプロパティをここにも複製し、
+   実際に印刷される見た目に近い状態でJSから高さを測れるようにしている） ===== */
+.print-measure .header-actions, .print-measure .month-nav button, .print-measure .add-slot-btn,
+.print-measure .chip .remove, .print-measure .slot-lock, .print-measure .slot-remove-day,
+.print-measure .slot-restore-btn, .print-measure .legend,
+.print-measure .stats-panel, .print-measure .screenshot-panel, .print-measure .workday-bar,
+.print-measure .print-footer, .print-measure .day-toggle { display: none !important; }
+.print-measure .layout { padding: 2px; gap: 0; min-height: 0 !important; }
+.print-measure .calendar-panel { width: 100%; }
+.print-measure .header { padding: calc(6px * var(--print-scale)) calc(10px * var(--print-scale)); }
+.print-measure .header h1 { font-size: calc(29px * var(--print-scale)); }
+.print-measure .calendar-grid { gap: calc(2px * var(--print-scale)); }
+.print-measure .weekdays { margin-bottom: calc(4px * var(--print-scale)); }
+.print-measure .weekday-label { padding: calc(7px * var(--print-scale)); font-size: calc(25px * var(--print-scale)); font-weight: 700; }
+.print-measure .day-cell { min-height: 0; padding: calc(5px * var(--print-scale)); }
+.print-measure .day-header { margin-bottom: calc(2px * var(--print-scale)); }
+.print-measure .day-num { font-size: calc(20px * var(--print-scale)); font-weight: 700; }
+.print-measure .slot { padding: calc(3px * var(--print-scale)) calc(5px * var(--print-scale)); margin-bottom: calc(3px * var(--print-scale)); }
+.print-measure .slot-header { margin-bottom: calc(1px * var(--print-scale)); font-size: calc(15px * var(--print-scale)); font-weight: 700; gap: calc(4px * var(--print-scale)); }
+.print-measure .slot-info { font-size: calc(13px * var(--print-scale)); }
+.print-measure .members-row { min-height: calc(24px * var(--print-scale)); gap: calc(3px * var(--print-scale)); }
+.print-measure .chip { font-size: calc(22px * var(--print-scale)); font-weight: 700; padding: calc(2px * var(--print-scale)) calc(7px * var(--print-scale)) calc(2px * var(--print-scale)) calc(6px * var(--print-scale)); line-height: 1.3; }
+.print-measure .notices-section { padding: calc(7px * var(--print-scale)) calc(12px * var(--print-scale)); }
+.print-measure .notices-section h4 { font-size: calc(18px * var(--print-scale)); font-weight: 700; margin-bottom: calc(5px * var(--print-scale)); }
+.print-measure .notices-textarea { min-height: calc(40px * var(--print-scale)) !important; padding: 4px 0 !important; font-size: calc(17px * var(--print-scale)); line-height: 1.4; }
+
+/* =====================================================================
+   ここから下はAI配置・スマホ対応版のための追加スタイル。
+   既存のPC向けレイアウトはそのまま残し、@mediaで画面幅が狭いときだけ
+   上書きする形にしているため、パソコンで開いたときの見た目・動作は
+   元の hananokai_scheduler.html と変わらない。
+   ===================================================================== */
+
+/* ===== スマホ・タブレット向けレイアウト調整 ===== */
+@media (max-width: 860px) {
+  body { font-size: 14px; }
+  .header { padding: 8px 10px; gap: 8px; position: sticky; top: 0; z-index: 60; }
+  .header h1 { font-size: 17px; }
+  .month-nav input[type="month"] { min-width: 100px; font-size: 13px; }
+  .header-actions { margin-left: 0; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .btn { min-height: 40px; font-size: 12px; padding: 6px 8px; }
+
+  .legend { padding: 6px 10px; gap: 10px; font-size: 10px; }
+  .workday-bar { padding: 8px 10px; gap: 8px; }
+  .workday-bar label { font-size: 12px; }
+  .workday-input { min-height: 40px; font-size: 16px; }
+  .workday-apply-btn { min-height: 40px; padding: 8px 14px; }
+
+  /* カレンダーと参加状況パネルを横並びから縦積みに */
+  .layout { flex-direction: column; padding: 8px; gap: 8px; min-height: 0; }
+  .stats-panel { width: 100%; }
+
+  .calendar-grid { gap: 3px; }
+  .day-cell { min-height: 0; padding: 4px; }
+  .day-num { font-size: 15px; }
+  .weekday-label { font-size: 13px; padding: 5px; }
+
+  .slot { padding: 4px 5px; }
+  .slot-header { font-size: 11px; }
+  .members-row { min-height: 34px; gap: 5px; }
+
+  /* チップ・追加ボタンのタップ領域をスマホ向けに拡大。
+     ホバーでしか出ない削除ボタンはタッチでは操作できないため常時表示にする */
+  .chip { font-size: 15px; padding: 6px 8px 6px 10px; min-height: 32px; cursor: default; }
+  .chip .remove { opacity: 0.55; font-size: 18px; padding: 2px 4px; }
+  .add-slot-btn { padding: 6px 10px; font-size: 13px; min-height: 32px; }
+
+  /* モーダルはスマホでは画面下からのシート表示にして親指で操作しやすくする */
+  .modal-overlay.open { align-items: flex-end; justify-content: center; }
+  .modal { width: 100%; max-width: 100%; border-radius: 16px 16px 0 0; max-height: 82vh; overflow-y: auto; }
+  .modal-row { padding: 10px 8px; min-height: 44px; }
+  .review-modal { width: 100%; max-width: 100%; max-height: 88vh; border-radius: 16px 16px 0 0; }
+
+  .notices-section { margin: 6px 8px 8px; }
+}
+
+/* ===== Gemini 相談パネル（フローティングボタン＋ドロワー） ===== */
+.gemini-fab {
+  position: fixed; right: 18px; bottom: 18px; z-index: 500;
+  width: 58px; height: 58px; border-radius: 50%; border: none;
+  background: linear-gradient(135deg, #4a7cf0, #8a4af0); color: white;
+  font-size: 26px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.gemini-fab:hover { filter: brightness(1.08); }
+.gemini-fab .badge { position: absolute; top: -2px; right: -2px; background: #f0a500; color: #3a2600; font-size: 10px; font-weight: bold; border-radius: 8px; padding: 1px 5px; display: none; }
+.gemini-fab .badge.show { display: block; }
+
+.gemini-drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 600; }
+.gemini-drawer-overlay.open { display: block; }
+.gemini-drawer {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 420px; max-width: 100vw;
+  background: #f7f8fb; z-index: 601; display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.25s ease; box-shadow: -6px 0 24px rgba(0,0,0,0.2);
+}
+.gemini-drawer-overlay.open .gemini-drawer { transform: translateX(0); }
+@media (max-width: 860px) {
+  .gemini-drawer { width: 100vw; }
+}
+.gemini-drawer-head { background: linear-gradient(135deg, #4a7cf0, #8a4af0); color: white; padding: 12px 14px; display: flex; align-items: center; gap: 8px; }
+.gemini-drawer-head h3 { font-size: 15px; flex: 1; }
+.gemini-drawer-head button { background: rgba(255,255,255,0.2); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; cursor: pointer; }
+.gemini-key-bar { background: #fff8e1; border-bottom: 1px solid #f0a500; padding: 8px 12px; font-size: 11px; color: #6d4c00; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gemini-key-bar button { background: #f0a500; color: #3a2600; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
+.gemini-key-bar .gk-status { color: #2c5f2e; font-weight: bold; }
+.gemini-chat-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.gemini-msg { max-width: 92%; padding: 8px 11px; border-radius: 12px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.gemini-msg.user { align-self: flex-end; background: #2c5f2e; color: white; border-bottom-right-radius: 3px; }
+.gemini-msg.model { align-self: flex-start; background: white; border: 1px solid #e0e0e0; border-bottom-left-radius: 3px; }
+.gemini-msg.system-note { align-self: center; background: none; color: #999; font-size: 11px; padding: 2px; }
+.gemini-msg.error { align-self: flex-start; background: #ffe0e0; color: #a00; border: 1px solid #f5b5b5; }
+.gemini-thinking { align-self: flex-start; color: #999; font-size: 12px; padding: 4px 8px; }
+.gemini-proposal { border: 2px solid #f0a500; background: #fffaf0; border-radius: 10px; padding: 10px; margin-top: 4px; font-size: 12px; }
+.gemini-proposal h4 { font-size: 12px; color: #8a5a00; margin-bottom: 6px; }
+.gemini-proposal .gp-row { padding: 2px 0; border-bottom: 1px dashed #eee; }
+.gemini-proposal .gp-actions { display: flex; gap: 8px; margin-top: 8px; }
+.gemini-proposal .gp-apply { flex: 1; background: #2c5f2e; color: white; border: none; border-radius: 6px; padding: 8px; font-weight: bold; cursor: pointer; font-size: 12.5px; }
+.gemini-proposal .gp-dismiss { background: white; border: 1px solid #ccc; color: #666; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 12.5px; }
+.gemini-quick-prompts { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
+.gemini-quick-prompts button { background: white; border: 1px solid #ccd; color: #445; border-radius: 14px; padding: 5px 10px; font-size: 11.5px; cursor: pointer; }
+.gemini-input-bar { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #e0e0e0; background: white; }
+.gemini-input-bar textarea { flex: 1; resize: none; border: 1px solid #ccc; border-radius: 10px; padding: 9px 11px; font-size: 13px; font-family: inherit; min-height: 40px; max-height: 120px; }
+.gemini-input-bar button { background: #2c5f2e; color: white; border: none; border-radius: 10px; padding: 0 16px; font-weight: bold; cursor: pointer; font-size: 13px; }
+.gemini-input-bar button:disabled { opacity: 0.5; cursor: default; }
+@media print { .gemini-fab, .gemini-drawer-overlay { display: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>🌸 花の会 作業予定表 <span style="font-size:0.55em; font-weight:normal; opacity:0.85;">AI・スマホ対応版</span></h1>
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">‹</button>
+    <input type="month" id="month-input" value="2026-07" onchange="setYearMonth(this.value)">
+    <button onclick="changeMonth(1)">›</button>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-auto" onclick="autoAssign()">⚡ 自動配置</button>
+    <button class="btn btn-clear" onclick="clearAssignments()">🗑 クリア</button>
+    <button class="btn btn-sc" id="btn-sc" onclick="toggleScreenshotPanel()">📥 希望日を入力</button>
+    <button class="btn btn-save" onclick="exportSaveFile()" title="今の内容をファイルに保存します。別のパソコン・ブラウザでも読み込めます">💾 一時保存</button>
+    <button class="btn btn-load" onclick="importSaveFileTrigger()" title="「一時保存」で保存したファイルを読み込みます">📂 読み込み</button>
+    <input type="file" id="save-file-input" accept="application/json,.json" style="display:none" onchange="importSaveFileChange(event)">
+    <button class="btn btn-print" onclick="window.print()">🖨 印刷 / PDF</button>
+    <button class="btn btn-image" id="btn-image-export" onclick="exportAsImage()" title="今月の予定表をPNG画像として保存します（LINE等でそのまま送りたい場合に）">🖼 画像で保存</button>
+  </div>
+</div>
+
+<!-- Screenshot Panel -->
+<div class="screenshot-panel" id="screenshot-panel">
+  <div class="screenshot-panel-inner">
+    <div class="screenshot-panel-header">
+      <span>📋 LINEのスクリーンショットをここに貼り付け（Ctrl+V）またはドラッグ＆ドロップ</span>
+      <button class="sc-clear" onclick="clearScreenshots()">全て削除</button>
+    </div>
+    <div class="sc-action-btns">
+      <label class="sc-file-btn" for="sc-file-input">📁 ファイルを選択</label>
+      <input type="file" id="sc-file-input" accept="image/*" multiple style="display:none" onchange="scFileInput(event)">
+      <button class="sc-file-btn" style="background:#2c5f2e;color:#8fca91;border-color:#3a7a3c"
+        onclick="parseAndApplyAllScreenshots()" title="貼り付けた全スクショの文字起こし結果をまとめて1回で反映します">
+        🔍 全スクショをまとめて反映
+      </button>
+    </div>
+    <div class="paste-area" id="paste-area" contenteditable="true"
+      ondragover="scDragOver(event)" ondragleave="scDragLeave(event)" ondrop="scDrop(event)"
+      onpaste="handlePasteArea(event)"
+      oninput="clearPasteArea(event)">
+      <div class="paste-area-icon">📋</div>
+      <div class="paste-area-label">ここをクリックして Ctrl+V で貼り付け</div>
+      <div class="paste-area-hint">✅ 準備OK — Ctrl+V を押してください</div>
+    </div>
+    <div class="screenshot-gallery" id="screenshot-gallery">
+      <span class="sc-empty" id="sc-empty">まだ画像がありません</span>
+    </div>
+
+    <div class="text-input-divider">── または、テキストで直接入力 ──</div>
+    <div class="text-input-section">
+      <div class="text-input-label">📋 名前と希望日をテキストで入力（LINEのメッセージをそのままコピペしてもOK）</div>
+      <textarea class="sc-ocr-text" id="text-input-area" placeholder="例）
+佐藤：午前1，2，4，5
+山田：1，2，11，15
+ジャスミン：夕方4．5．6．7
+花子：午後4，5，12，30"></textarea>
+      <div class="sc-action-btns">
+        <button class="sc-file-btn" style="background:#2c5f2e;color:#8fca91;border-color:#3a7a3c"
+          onclick="parseAndApplyTextInput()" title="入力したテキストを解析して反映します">
+          🔍 テキストを解析して反映
+        </button>
+        <button class="sc-file-btn" onclick="clearTextInput()">🗑 クリア</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 作業日設定バー -->
+<div class="workday-bar">
+  <label>📅 今月の作業日数</label>
+  <div class="workday-input-wrap">
+    <input class="workday-input" type="number" id="workday-count" min="1" max="31" value="10"
+      onkeydown="if(event.key==='Enter') applyWorkdays()">
+    <span class="workday-unit">日</span>
+    <button class="workday-apply-btn" onclick="applyWorkdays()">設定する</button>
+  </div>
+  <span class="workday-status">現在: <span class="wdc" id="workday-current">0</span> 日設定済み</span>
+  <span class="workday-hint">※ 平日・土日を区別せず月全体にまんべんなく選択されます。日付をクリックして個別に変更できます</span>
+  <span id="session-mode-badge" class="session-badge mode1" onclick="toggleSessionMode()" style="cursor:pointer" title="クリックで手動切り替え">📋 1回制</span>
+  <span class="session-override" onclick="toggleSessionMode()" title="手動で切り替え">切替</span>
+  <span id="month-note-wrap" style="display:none; align-items:center; gap:4px;">
+    <label style="font-size:11px; color:#888; white-space:nowrap;">📝 何月分か:</label>
+    <input type="text" id="month-note-input" placeholder="例: 7月分"
+      style="width:90px; padding:3px 6px; border:1px solid #ccc; border-radius:4px; font-size:12px;"
+      oninput="saveNotes('sessionMonthNote', this.value)">
+  </span>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot am"></div> 午前（朱字）</div>
+  <div class="legend-item"><div class="legend-dot pm"></div> 午後（青字）</div>
+  <div class="legend-item"><div class="legend-dot pending"></div> 保留（要確認）</div>
+</div>
+
+<!-- Main layout -->
+<div class="layout">
+  <div class="calendar-panel">
+    <div class="weekdays">
+      <div class="weekday-label sun">日</div>
+      <div class="weekday-label">月</div>
+      <div class="weekday-label">火</div>
+      <div class="weekday-label">水</div>
+      <div class="weekday-label">木</div>
+      <div class="weekday-label">金</div>
+      <div class="weekday-label sat">土</div>
+    </div>
+    <div class="calendar-grid" id="calendar-grid"></div>
+  </div>
+  <div class="stats-panel" id="stats-panel"></div>
+</div>
+
+<!-- 連絡事項 -->
+<div class="notices-section" id="notices-section">
+  <h4>連絡事項</h4>
+  <textarea class="notices-textarea" id="notices-text"
+    placeholder="例）15日（水）10時～除草等を行います。ご都合のつく方はご参加ください。&#10;パンジー追肥を予定しています。"></textarea>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<!-- Print footer -->
+<div class="print-footer">
+  <h4>【連絡事項】</h4>
+  <div class="footer-lines"></div>
+</div>
+
+<!-- Member picker modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <h3 id="modal-title"></h3>
+    <div class="modal-sub" id="modal-sub"></div>
+    <div class="modal-list" id="modal-list"></div>
+    <div class="modal-freetext">
+      <input type="text" id="modal-freetext-input" placeholder="名簿にない人を名前で直接追加"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();addFreeTextMember();}">
+      <button class="btn btn-auto" onclick="addFreeTextMember()">追加</button>
+    </div>
+    <button class="modal-close" onclick="closeModal()">キャンセル</button>
+  </div>
+</div>
+
+<!-- スクショ解析結果レビューモーダル（ブラウザ標準のconfirm()は画面が小さく
+     途中までしか読めずスクロールも効かないため、代わりにこちらを使う） -->
+<div class="modal-overlay" id="review-modal-overlay" onclick="closeReviewModal(event)">
+  <div class="modal review-modal" onclick="event.stopPropagation()">
+    <h3>📋 解析結果を確認してください</h3>
+    <div class="modal-sub" id="review-modal-sub"></div>
+    <div class="review-modal-body" id="review-modal-body"></div>
+    <div class="review-modal-actions">
+      <button class="modal-close" onclick="closeReviewModal()">キャンセル</button>
+      <button class="review-apply-btn" onclick="confirmApplyParsedMembers()">✅ この内容で反映する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Gemini 相談パネル ===== -->
+<button class="gemini-fab" id="gemini-fab" onclick="openGeminiDrawer()" title="Geminiにスケジュール作成を相談する">
+  🤖<span class="badge" id="gemini-fab-badge">!</span>
+</button>
+<div class="gemini-drawer-overlay" id="gemini-drawer-overlay" onclick="if(event.target===this) closeGeminiDrawer()">
+  <div class="gemini-drawer">
+    <div class="gemini-drawer-head">
+      <h3>🤖 Geminiにスケジュールを相談</h3>
+      <button onclick="closeGeminiDrawer()" title="閉じる">✕</button>
+    </div>
+    <div class="gemini-key-bar" id="gemini-key-bar">
+      <span id="gemini-key-status">APIキー未設定</span>
+      <button onclick="promptGeminiApiKey()">🔑 APIキーを設定</button>
+    </div>
+    <div class="gemini-quick-prompts" id="gemini-quick-prompts">
+      <button onclick="sendGeminiQuickPrompt('今月の未配置の枠を教えて。埋め方の案も一緒に出して')">未配置の枠を確認</button>
+      <button onclick="sendGeminiQuickPrompt('今の空き状況をもとに、できるだけ公平になるようスケジュール案を作って')">公平な配置案を作る</button>
+      <button onclick="sendGeminiQuickPrompt('参加回数が特定の人に偏っていないかチェックして')">偏りをチェック</button>
+      <button onclick="sendGeminiQuickPrompt('◯日の◯◯さんを、代わりに誰にすればいいか提案して')">1人だけ修正したい</button>
+    </div>
+    <div class="gemini-chat-log" id="gemini-chat-log">
+      <div class="gemini-msg system-note">Geminiに今月の空き状況・配置状況を伝えながら相談できます。ゼロから作るのはもちろん、「〇〇さんを△△さんに変えて」のような一部だけの修正も文章でお願いできます。提案されたスケジュールは内容を確認してから「反映する」を押すまでカレンダーには反映されません。</div>
+    </div>
+    <div class="gemini-input-bar">
+      <textarea id="gemini-input" placeholder="例）15日の田中さんを、代わりに鈴木さんにしてください" onkeydown="handleGeminiInputKeydown(event)"></textarea>
+      <button id="gemini-send-btn" onclick="sendGeminiMessage()">送信</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========================
+// DATA
+// ========================
+// 目安人数: 1回制は2〜3名、2回制は午前+午後の合計で3〜4名（内訳は状況に応じて調整）
+const SOLO_MODE_MIN = 2;
+const SOLO_MODE_MAX = 3;
+const DUAL_MODE_TOTAL_MIN = 3;
+const DUAL_MODE_TOTAL_MAX = 4;
+
+// 日ごとの目標人数（手動で個別設定した日のみ使う）
+// dayTargets[day] = { am: n, pm: n }
+let dayTargets = {};
+
+// (v3) 2回制（午前＋午後）の月でも、その日だけ午前か午後の片方しか
+// 活動しない日がある（例: 午後だけの日）ため、日ごとに片方の枠だけを
+// 非表示（＝その日は実質1回制）にできるようにする。
+// disabledSlots[day] = 'am' | 'pm'（消してある方の枠。両方は消せない）
+let disabledSlots = {};
+
+// 2回制の日について、その日実際に午前/午後それぞれに配置できそうな人数を見て、
+// 合計3〜4名になるよう午前・午後の目標人数を調整する（例: 午前1名しかいなければ午後を3名にする）
+function computeAdaptiveDayTargets(day) {
+  const amEligible = MEMBERS.filter(m => isAvailable(m, day, 'am')).length;
+  const pmEligible = MEMBERS.filter(m => isAvailable(m, day, 'pm')).length;
+
+  let am = 2, pm = 2; // デフォルトは午前午後2名ずつ（合計4名）でもよい
+  if (amEligible < 2 && pmEligible >= 3) {
+    am = amEligible;
+    pm = Math.min(pmEligible, Math.max(DUAL_MODE_TOTAL_MAX - am, 3));
+  } else if (pmEligible < 2 && amEligible >= 3) {
+    pm = pmEligible;
+    am = Math.min(amEligible, Math.max(DUAL_MODE_TOTAL_MAX - pm, 3));
+  }
+  return { am, pm };
+}
+
+function getTarget(day, slot) {
+  if (dayTargets[day] && dayTargets[day][slot] != null) return dayTargets[day][slot];
+  if (sessionMode === 1) return SOLO_MODE_MAX; // 1回制: 2〜3名を目指す（上限を表示・自動配置の目安に使う）
+  return computeAdaptiveDayTargets(day)[slot]; // 2回制: 状況に応じて午前午後を調整
+}
+
+function setTarget(day, slot) {
+  const label = slot === 'am' ? '午前' : '午後';
+  const current = getTarget(day, slot);
+  const input = prompt(`${currentMonth}月${day}日（${label}）の目標人数を入力してください`, current);
+  if (input === null) return;
+  const n = parseInt(input, 10);
+  if (isNaN(n) || n < 0) { alert('0以上の数字を入力してください'); return; }
+  if (!dayTargets[day]) dayTargets[day] = {};
+  dayTargets[day][slot] = n;
+  render();
+}
+
+let currentYear = 2026;
+let currentMonth = 7; // 1-indexed（安田ちづるさんの「31日」NG日回答から31日ある月と判断し7月に設定）
+
+// ★ メンバーデータ
+// 以前は2026/4分のLINEスクショの希望日データがここに埋め込まれていたが、月が変わっても
+// 自動では消えず、スクショを取り込んでいない月でも古い希望日がそのまま表示・集計されて
+// しまう問題があったため、希望日データ（available/unavailable/status/aiComment）は
+// 全員リセット済み。氏名・時間帯希望のみ引き継いでいる。新しい月の希望日は
+// 「LINEスクショ」パネルから取り込んでください。
+// role フィールドは現在表示には使用していない（ベテラン／新人の区分は使わないため）
+// timePref は保存せず、availableAm/availablePm から都度計算する（timePrefLabel参照）。
+// (v3) 以前はここに実際のメンバー19名を「全員 希望未確定・0/?回」の状態で
+// 初期データとして埋め込んでいたが、運用が「テキスト/スクショで入力された人
+// だけを登録する」形に変わったため、意味のない空欄一覧が毎回表示されるだけに
+// なっていた。そのため初期状態は空にし、テキスト入力・LINEスクショの取り込み、
+// または＋ボタンでの手動追加によって初めてメンバーが登録されるようにした。
+// なお一度でも取り込み・追加を行えば、その内容は13章（自動保存）の仕組みで
+// ブラウザに保存され、次回開いたときも空に戻らず維持される。
+let MEMBERS = [];
+
+// timePref はもう保存しない（availableAm/availablePmから都度計算する）。
+// 「終日可能」「午前のみ」「午後のみ」「未設定」の4種類でラベル表示に使う。
+function timePrefLabel(m) {
+  const hasAm = (m.availableAm || []).length > 0;
+  const hasPm = (m.availablePm || []).length > 0;
+  if (hasAm && hasPm) return '終日可能';
+  if (hasAm) return '午前のみ';
+  if (hasPm) return '午後のみ';
+  return '未設定';
+}
+
+// 午前・午後どちらかにでも可能日を持っていれば「参加可能日あり」とみなすための、
+// 月全体（両セッション合算）の可能日一覧。作業日設定や「希望日あり／なし」の
+// 判定など、午前午後を区別しない箇所で使う。
+function allAvailableDays(m) {
+  return [...new Set([...(m.availableAm || []), ...(m.availablePm || [])])];
+}
+
+// workDays: Set of active work day numbers
+let workDays = new Set();
+
+// sessionMode: 1 = 1回制（午前のみ）, 2 = 2回制（午前＋午後）。月に連動せず、常に手動で切り替える
+let sessionMode = 1;
+
+function toggleSessionMode() {
+  sessionMode = sessionMode === 1 ? 2 : 1;
+  updateSessionModeUI();
+  render();
+}
+
+function updateSessionModeUI() {
+  const badge = document.getElementById('session-mode-badge');
+  if (badge) {
+    if (sessionMode === 1) {
+      badge.textContent = '📋 1回制';
+      badge.className = 'session-badge mode1';
+    } else {
+      badge.textContent = '📋 午前・午後 2回制';
+      badge.className = 'session-badge mode2';
+    }
+  }
+  // 2回制のときだけ「何月分のスケジュールか」を手動でメモできる欄を表示する
+  const noteWrap = document.getElementById('month-note-wrap');
+  if (noteWrap) {
+    noteWrap.style.display = sessionMode === 2 ? 'inline-flex' : 'none';
+  }
+}
+
+// schedule[day][slot] = [memberId, ...]
+// slot: 'am' or 'pm'
+let schedule = {};
+// locked[day][slot] = true/false
+let locked = {};
+
+// Drag state
+let dragState = null; // { memberId, fromDay, fromSlot }
+
+// Modal state
+let modalState = null; // { day, slot }
+
+// ========================
+// SCHEDULE HELPERS
+// ========================
+function getSlot(day, slot) {
+  if (!schedule[day]) schedule[day] = { am: [], pm: [] };
+  return schedule[day][slot] || [];
+}
+function setSlot(day, slot, arr) {
+  if (!schedule[day]) schedule[day] = { am: [], pm: [] };
+  schedule[day][slot] = arr;
+}
+function isLocked(day, slot) {
+  return locked[day] && locked[day][slot];
+}
+function toggleLock(day, slot) {
+  if (!locked[day]) locked[day] = {};
+  locked[day][slot] = !locked[day][slot];
+  render();
+}
+
+// (v3) 2回制の月でも、その日だけ午前 or 午後の片方を消して実質1回制にする／
+// 消した枠を復活させる。両方は消せない（どちらか一方は必ず残す）。
+function toggleDaySlot(day, slot) {
+  if (sessionMode !== 2) return;
+  const other = slot === 'am' ? 'pm' : 'am';
+  if (disabledSlots[day] === slot) {
+    delete disabledSlots[day];
+  } else {
+    if (disabledSlots[day] === other) return; // 既にもう片方が消えている場合は両方消させない
+    disabledSlots[day] = slot;
+  }
+  render();
+}
+function removeMember(day, slot, memberId) {
+  if (isLocked(day, slot)) return;
+  const arr = getSlot(day, slot).filter(id => id !== memberId);
+  setSlot(day, slot, arr);
+  render();
+}
+function addMember(day, slot, memberId) {
+  if (isLocked(day, slot)) return;
+  const arr = getSlot(day, slot);
+  if (!arr.includes(memberId)) {
+    arr.push(memberId);
+    setSlot(day, slot, arr);
+  }
+  render();
+}
+function getMember(id) {
+  return MEMBERS.find(m => m.id === id);
+}
+// slot ('am'/'pm') ごとに、その人がその日に希望しているかどうかを判定する。
+// 以前はここが「可能日リスト1本」＋「時間帯フラグ（朝のみ／夕のみ／終日可能）」
+// という作りで、午前と午後で違う日を希望するケースを表現できなかった。
+function isAvailable(member, day, slot) {
+  const list = slot === 'pm' ? member.availablePm : member.availableAm;
+  return (list || []).includes(day);
+}
+function isNgDay(member, day, slot) {
+  const list = slot === 'pm' ? member.unavailablePm : member.unavailableAm;
+  return (list || []).includes(day);
+}
+
+// ========================
+// WORKDAY SETUP
+// ========================
+function applyWorkdays() {
+  const n = parseInt(document.getElementById('workday-count').value) || 0;
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+  // 土日のみ参加のメンバーもいるため、平日・土日を区別せず全ての日を対等に扱う
+  const allDays = [];
+  for (let d = 1; d <= daysInMonth; d++) allDays.push(d);
+
+  // まず月全体へ均等な間隔でn日を選ぶ（基本形。連続した日に作業しても意味がないため）
+  let selected = pickEvenlySpaced(allDays, Math.min(n, allDays.length));
+
+  // 作業日数（n日）は最優先で厳守する。そのうえで、希望日数が少ない（10日以下の）
+  // 確定メンバーの希望が「できる範囲でMAX」になるよう、作業日を追加するのではなく
+  // 均等配置で選ばれた日の一部を、本人の希望日に差し替える（他のメンバーが既に
+  // その日を必要としていない場合に限る＝日数は増減させない）。
+  const constrained = MEMBERS.filter(m => {
+    const n = allAvailableDays(m).length;
+    return m.status === '確定' && n > 0 && n <= 10;
+  });
+  constrained.forEach(m => {
+    const days = allAvailableDays(m);
+    const hasOverlap = days.some(d => selected.includes(d));
+    if (hasOverlap) return;
+    let bestIdx = -1, bestDay = null, bestDist = Infinity;
+    selected.forEach((sd, idx) => {
+      days.forEach(md => {
+        const dist = Math.abs(sd - md);
+        if (dist < bestDist) { bestDist = dist; bestIdx = idx; bestDay = md; }
+      });
+    });
+    if (bestIdx >= 0 && !selected.includes(bestDay)) selected[bestIdx] = bestDay;
+  });
+
+  selected = [...new Set(selected)].sort((a, b) => a - b);
+
+  workDays = new Set(selected);
+
+  // 「設定する」を押すたびに、その月の配置・ロック状態は全部クリアする
+  // （作業日数を変えるたびに参加回数が0からやり直しになるようにするため。
+  // オブジェクトを丸ごと作り直し、古いキーが集計に混ざらないようにする）
+  schedule = {};
+  locked = {};
+
+  updateWorkdayCount();
+  render();
+}
+
+// pool（日付の配列）から n 個を、できるだけ月全体に均等な間隔になるように選ぶ
+function pickEvenlySpaced(pool, n) {
+  if (n <= 0 || pool.length === 0) return [];
+  if (n >= pool.length) return pool.slice();
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    const idx = Math.floor((i + 0.5) * pool.length / n);
+    result.push(pool[Math.min(idx, pool.length - 1)]);
+  }
+  return result;
+}
+
+function toggleWorkDay(day) {
+  if (workDays.has(day)) {
+    workDays.delete(day);
+    // Clear schedule for that day
+    schedule[day] = { am: [], pm: [] };
+    locked[day] = {};
+  } else {
+    workDays.add(day);
+  }
+  updateWorkdayCount();
+  render();
+}
+
+function updateWorkdayCount() {
+  const el = document.getElementById('workday-current');
+  if (el) el.textContent = workDays.size;
+}
+
+// ========================
+// AUTO-ASSIGN
+// ========================
+function autoAssign() {
+  // 作業日数がまだ「設定する」で反映されていない場合は、ここで自動的に反映する
+  if (workDays.size === 0) {
+    applyWorkdays();
+  }
+
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    // 作業日のみ
+    if (!workDays.has(day)) continue;
+
+    // Assign AM（(v3) 2回制でその日だけ午前を消してある場合はスキップ）
+    if (!isLocked(day, 'am') && disabledSlots[day] !== 'am') {
+      const assigned = autoAssignSlot(day, 'am', getTarget(day, 'am'), []);
+      setSlot(day, 'am', assigned);
+    }
+
+    // Assign PM（(v3) 2回制でその日だけ午後を消してある場合はスキップ）
+    if (!isLocked(day, 'pm') && disabledSlots[day] !== 'pm') {
+      const amAssigned = getSlot(day, 'am');
+      const assigned = autoAssignSlot(day, 'pm', getTarget(day, 'pm'), amAssigned);
+      setSlot(day, 'pm', assigned);
+    }
+  }
+  render();
+}
+
+// 表示中の月の配置・ロック状態に加えて、取り込み済みのメンバー希望日データも
+// まとめてクリアする。作業日の設定・連絡事項は変更しない。ロック中の枠もまとめて解除する。
+// (v3で変更) 以前は各メンバーを削除せず「保留・希望未確定」の空データに戻すだけだったが、
+// そのままだと参加回数・希望日一覧パネルに中身のない「希望未確定」の行がクリア後も
+// ずっと残り続けてしまい紛らわしかった。現在の運用は「テキスト/スクショ/手動追加で
+// 登録した人だけを表示する」方針（2章参照）のため、クリア時も名簿ごと空に戻し、
+// パネルに何も残らないようにする（再度テキスト入力・スクショ取り込みで登録し直す想定）。
+function clearAssignments() {
+  if (!confirm(`${currentMonth}月の配置と、登録済みのメンバー（希望日データ）をすべてクリアしますか？\n（作業日の設定はそのまま残ります。メンバーは名簿ごと空になります。この操作は元に戻せません）`)) return;
+  // オブジェクトを丸ごと作り直すことで、月をまたいだ古いキーが万が一残っていても
+  // 参加回数の集計（Object.values(schedule)）に混ざらないようにする
+  schedule = {};
+  locked = {};
+  // 名簿ごと空にする（＝参加回数・希望日一覧パネルには何も表示されなくなる）
+  MEMBERS = [];
+  render();
+}
+
+// 月全体で必要な配置枠数（作業日×目標人数の合計）を数える
+function getTotalSlotsNeeded() {
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  let total = 0;
+  for (let day = 1; day <= daysInMonth; day++) {
+    if (!workDays.has(day)) continue;
+    if (disabledSlots[day] !== 'am') total += getTarget(day, 'am');
+    if (sessionMode === 2 && disabledSlots[day] !== 'pm') total += getTarget(day, 'pm');
+  }
+  return total;
+}
+
+// 特定の人（終日可能で参加可能日数が多い人）だけが突出して配置され続けるのを防ぐための
+// 「公平な上限」を計算する。全枠数 ÷ 確定メンバー数を基準に、多少の余裕（+1）を持たせる。
+// 参加可能日が少ない人はこの上限に達する前にavailableでフィルタされるため影響を受けない。
+function getFairAssignmentCap() {
+  const totalSlots = getTotalSlotsNeeded();
+  const activeMembers = MEMBERS.filter(m => m.status === '確定' && allAvailableDays(m).length > 0);
+  if (activeMembers.length === 0) return Infinity;
+  return Math.max(1, Math.ceil(totalSlots / activeMembers.length) + 1);
+}
+
+function autoAssignSlot(day, slot, target, alreadyUsedToday) {
+  // Get participation counts so far
+  const counts = getParticipationCounts();
+  const fairCap = getFairAssignmentCap();
+
+  // Eligible members for this slot
+  let eligible = MEMBERS.filter(m => isAvailable(m, day, slot));
+
+  if (eligible.length === 0) return [];
+
+  // 優先順位（上から順に判定）:
+  // 1) 参加可能日数が少ない人を最優先する。可能日が少ない人（例: 4〜8日）は、
+  //    自分が参加できる数少ない日に必ず配置されないと「希望回数の上限（＝可能日数）」
+  //    まで到達できないため、可能日数が多い人（例: 26〜28日＝ほぼ終日可能）より
+  //    常に優先する。
+  // 2) 公平な上限（fairCap）にまだ達していない人を優先する。同程度の可能日数を
+  //    持つ人同士で、一部の人だけ8〜9回など突出して配置され続けるのを防ぐ。
+  // 3) 「これまでの配置回数 ÷ 参加可能日数」の比率が低い人を優先する（Rule 3+6）。
+  const slotDayCount = m => (slot === 'pm' ? m.availablePm : m.availableAm).length;
+  eligible.sort((a, b) => {
+    if (slotDayCount(a) !== slotDayCount(b)) return slotDayCount(a) - slotDayCount(b);
+
+    const countA = counts[a.id] || 0;
+    const countB = counts[b.id] || 0;
+    const underCapA = countA < fairCap;
+    const underCapB = countB < fairCap;
+    if (underCapA !== underCapB) return underCapA ? -1 : 1;
+
+    const ratioA = countA / Math.max(slotDayCount(a), 1);
+    const ratioB = countB / Math.max(slotDayCount(b), 1);
+    return ratioA - ratioB;
+  });
+
+  // Rule 5: diversify combinations - penalize members who were assigned yesterday
+  // (simple: slightly lower priority if assigned adjacent day)
+  const yesterdayAssigned = new Set();
+  if (day > 1) {
+    (getSlot(day-1, 'am') || []).forEach(id => yesterdayAssigned.add(id));
+    (getSlot(day-1, 'pm') || []).forEach(id => yesterdayAssigned.add(id));
+  }
+
+  let selected = [];
+
+  // まず「公平な上限（fairCap）」未満の人だけで目標人数を埋めようとする。
+  // 終日可能で可能日数が多い人（例: 藤田・為国）が上限に達している場合は、
+  // 他に候補がいる限りその人を使わずに済ませる。
+  for (const m of eligible) {
+    if (selected.length >= target) break;
+    const c = counts[m.id] || 0;
+    if (c < fairCap) selected.push(m.id);
+  }
+
+  // それでも最低限必要な人数（SOLO_MODE_MIN、2回制は1名）に届かない場合だけ、
+  // 上限を超えている人も動員する（「誰もいない日」を作らないための最終手段）。
+  const minNeeded = sessionMode === 1 ? SOLO_MODE_MIN : 1;
+  if (selected.length < Math.min(minNeeded, eligible.length)) {
+    for (const m of eligible) {
+      if (selected.length >= target) break;
+      if (selected.includes(m.id)) continue;
+      selected.push(m.id);
+    }
+  }
+
+  return selected;
+}
+
+function getParticipationCounts() {
+  const counts = {};
+  MEMBERS.forEach(m => counts[m.id] = 0);
+  Object.values(schedule).forEach(daySlots => {
+    (daySlots.am || []).forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+    // 1回制では午後枠はカレンダー上に表示されないため、集計にも含めない
+    // （2回制で配置した後に1回制へ切り替えた場合の「見えないのに集計だけ残る」ズレを防ぐ）
+    if (sessionMode === 2) {
+      (daySlots.pm || []).forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+    }
+  });
+  return counts;
+}
+
+// ========================
+// RENDER
+// ========================
+function render() {
+  renderMonthLabel();
+  renderCalendar();
+  renderStats();
+  // render()はほぼ全ての操作（配置・ロック・自動配置・クリア・インポート等）の
+  // 後に必ず呼ばれるため、ここで自動保存しておけば個別の操作ごとに保存し忘れる
+  // 心配がない（詳細は restoreStateOnLoad 付近のコメントを参照）。
+  saveFullState();
+}
+
+function renderMonthLabel() {
+  const input = document.getElementById('month-input');
+  if (input) {
+    const mm = String(currentMonth).padStart(2, '0');
+    input.value = `${currentYear}-${mm}`;
+  }
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendar-grid');
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const firstDow = new Date(currentYear, currentMonth - 1, 1).getDay(); // 0=Sun
+  const today = new Date();
+
+  let html = '';
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDow; i++) {
+    html += `<div class="day-cell empty-cell"></div>`;
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dow = new Date(currentYear, currentMonth - 1, day).getDay();
+    const isToday = today.getFullYear() === currentYear &&
+                    today.getMonth() + 1 === currentMonth &&
+                    today.getDate() === day;
+    const isSat = dow === 6;
+    const isSun = dow === 0;
+    const isWeekend = isSat || isSun;
+    // 月・水・金は薄い黄色で目立たせてほしいとの要望に対応（曜日の色分け）
+    const isMonWedFri = dow === 1 || dow === 3 || dow === 5;
+
+    const isWorkDay = workDays.size === 0 || workDays.has(day);
+    const classNames = ['day-cell'];
+    if (isToday) classNames.push('today');
+    if (isWeekend) classNames.push('weekend');
+    if (isMonWedFri) classNames.push('mwf');
+    if (!isWorkDay) classNames.push('inactive');
+    if (isWorkDay && workDays.size > 0) classNames.push('workday');
+
+    const amMembers = getSlot(day, 'am');
+    const pmMembers = getSlot(day, 'pm');
+
+    html += `<div class="${classNames.join(' ')}"
+      data-day="${day}"
+      ondragover="handleDayCellDragOver(event)"
+      ondrop="handleDayCellDrop(event)"
+      ondragleave="handleDayCellDragLeave(event)">`;
+    html += `<div class="day-header">`;
+
+    let dayNumClass = 'day-num';
+    if (isSun) dayNumClass += ' sun';
+    if (isSat) dayNumClass += ' sat';
+    if (isToday) dayNumClass += ' day-today-mark';
+
+    html += `<span class="${dayNumClass}">${day}</span>`;
+    // Toggle button（作業日のチェックはドラッグして別の日にずらすこともできる）
+    if (workDays.size > 0 || !isWorkDay) {
+      const dragAttrs = isWorkDay
+        ? `draggable="true" ondragstart="handleWorkdayDragStart(event, ${day})" title="ドラッグで別の日に移動／クリックで作業日から外す"`
+        : `title="作業日にする（作業日のチェックをここへドラッグしても移動できます）"`;
+      html += `<span class="day-toggle" onclick="toggleWorkDay(${day})" ${dragAttrs}>${isWorkDay ? '✓' : '＋'}</span>`;
+    }
+    html += `</div>`;
+
+    // AM/PM slots (only for work days, based on session mode)
+    if (isWorkDay) {
+      if (sessionMode === 1) {
+        html += renderSlot(day, 'am', amMembers, '作業');
+      } else {
+        // (v3) 2回制でも、その日だけ午前 or 午後を消して実質1回制にできる
+        // （両方は消せない＝どちらか片方は必ず残る）
+        const amOff = disabledSlots[day] === 'am';
+        const pmOff = disabledSlots[day] === 'pm';
+        if (amOff) {
+          html += `<button class="add-slot-btn slot-restore-btn" onclick="toggleDaySlot(${day}, 'am')" title="午前を復活させる">＋ 午前</button>`;
+        } else {
+          html += renderSlot(day, 'am', amMembers);
+        }
+        if (pmOff) {
+          html += `<button class="add-slot-btn slot-restore-btn" onclick="toggleDaySlot(${day}, 'pm')" title="午後を復活させる">＋ 午後</button>`;
+        } else {
+          html += renderSlot(day, 'pm', pmMembers);
+        }
+      }
+    }
+
+    html += `</div>`;
+  }
+
+  grid.innerHTML = html;
+
+  // Add drag & drop listeners
+  setupDragDrop();
+}
+
+function renderSlot(day, slot, members, labelOverride) {
+  const lockState = isLocked(day, slot);
+  const label = labelOverride || (slot === 'am' ? '午前' : '午後');
+  const target = getTarget(day, slot);
+  const warnings = getSlotWarnings(day, slot, members);
+  const hasWarn = warnings.length > 0;
+
+  let html = `<div class="slot ${slot}"
+    data-day="${day}" data-slot="${slot}"
+    ondragover="handleDragOver(event)"
+    ondrop="handleDrop(event)"
+    ondragleave="handleDragLeave(event)">`;
+
+  html += `<div class="slot-header">`;
+  html += `<span class="slot-label ${slot}">${label}</span>`;
+  html += `<span class="slot-info" onclick="setTarget(${day}, '${slot}')" style="cursor:pointer" title="クリックで目標人数を変更">${members.length}/${target} ✎</span>`;
+  if (hasWarn) html += `<span title="${warnings.join('\n')}">⚠️</span>`;
+  html += `<span class="slot-lock ${lockState ? 'locked' : ''}"
+    onclick="toggleLock(${day}, '${slot}')"
+    title="${lockState ? 'ロック解除' : 'ロック（固定）'}">
+    ${lockState ? '🔒' : '🔓'}</span>`;
+  // (v3) 2回制の日でも、その日だけ午前/午後の片方しか活動しない場合に
+  // 枠自体を消せるようにする（消すと「＋午前」「＋午後」ボタンに変わり、
+  // いつでも復活できる）
+  if (sessionMode === 2) {
+    html += `<span class="slot-remove-day" onclick="toggleDaySlot(${day}, '${slot}')" title="この日は${label}を使わない">✕</span>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="members-row">`;
+  members.forEach(memberId => {
+    const m = getMember(memberId);
+    if (!m) return;
+    const isPending = m.status === '保留';
+    const chipClass = `chip ${slot}${isPending ? ' pending' : ''}`;
+    html += `<span class="${chipClass}"
+      draggable="true"
+      data-member-id="${memberId}"
+      data-day="${day}"
+      data-slot="${slot}"
+      ondragstart="handleDragStart(event)"
+      title="${m.name}${isPending ? ' ⚠️ ' + (m.aiComment || '保留') : ''}">`;
+    if (isPending) html += `<span class="pending-icon">⚠️</span>`;
+    html += `${m.name}`;
+    if (!lockState) {
+      html += `<span class="remove" onclick="removeMember(${day}, '${slot}', ${memberId})" title="削除">×</span>`;
+    }
+    html += `</span>`;
+  });
+
+  // (v3) 目標人数に達すると＋ボタンが消えて、それ以上追加できなくなっていたが、
+  // 目標人数を超えて配置したいこともあるとの要望のため、上限を撤廃し常に追加できるようにした
+  if (!lockState) {
+    html += `<button class="add-slot-btn" onclick="openModal(${day}, '${slot}')" title="メンバーを追加">＋</button>`;
+  }
+  html += `</div>`;
+  html += `</div>`;
+  return html;
+}
+
+function getSlotWarnings(day, slot, members) {
+  const warnings = [];
+  // (v3) 人数不足はもうエラー・警告として扱わない、との要望により、
+  // 目標人数との比較チェック自体を削除した（NG日配置・希望外の枠への
+  // 配置の警告は引き続き行う）。
+
+  members.forEach(id => {
+    const m = getMember(id);
+    if (!m) return;
+    if (isNgDay(m, day, slot)) warnings.push(`${m.name}: NG日に配置`);
+    else if (!isAvailable(m, day, slot)) warnings.push(`${m.name}: 希望していない枠`);
+  });
+  return warnings;
+}
+
+// ========================
+// STATS PANEL
+// ========================
+// 本人の本当の希望回数（＝available.length とは限らない）。
+// limitToOneDay フラグが立っている人（例: 岩元。可能日は複数あるが実際は
+// そのうち1日だけ希望）は、可能日数ではなく1を希望回数として扱う。
+function getDesiredCount(m) {
+  if (m.limitToOneDay) return 1;
+  // 1回制は午前枠しか使わないため午前の可能日数のみ、2回制は午前・午後を
+  // それぞれ別セッションとして数えるため両方の合計を希望回数とする
+  if (sessionMode === 1) return (m.availableAm || []).length;
+  return (m.availableAm || []).length + (m.availablePm || []).length;
+}
+
+function renderStats() {
+  const panel = document.getElementById('stats-panel');
+  const counts = getParticipationCounts();
+  const maxCount = Math.max(...Object.values(counts), 1);
+
+  let html = '';
+
+  // 参加回数（多い順）＋ 希望との照合をまとめて1枚のカードに表示する
+  html += `<div class="stats-card">`;
+  html += `<h3><span class="icon">📊</span>参加回数（多い順）</h3>`;
+  const sortedMembers = [...MEMBERS].sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+  sortedMembers.forEach(m => {
+    const count = counts[m.id] || 0;
+    const desired = getDesiredCount(m);
+    const pct = (count / maxCount * 100).toFixed(0);
+
+    let desiredLabel, statusHtml, rowColor = '#333';
+    if (m.status === '保留' || m.status === '解析不能') {
+      desiredLabel = '?';
+      statusHtml = '<span style="color:#999">希望未確定</span>';
+      rowColor = '#999';
+    } else if (desired === 0) {
+      desiredLabel = '?';
+      statusHtml = '<span style="color:#999">希望日データなし</span>';
+      rowColor = '#999';
+    } else {
+      desiredLabel = desired;
+      if (count === 0) {
+        statusHtml = '<span style="color:#b71c1c">⚠️ 未配置</span>';
+        rowColor = '#b71c1c';
+      } else if (count > desired) {
+        statusHtml = '<span style="color:#b71c1c">🔴 超過</span>';
+        rowColor = '#b71c1c';
+      } else {
+        statusHtml = '<span style="color:#1b5e20">✅ 合致</span>';
+      }
+    }
+
+    html += `<div class="member-stat" style="color:${rowColor}">`;
+    html += `<span class="m-name" style="width:64px">${m.name}</span>`;
+    html += `<div class="m-bar-wrap"><div class="m-bar" style="width:${pct}%"></div></div>`;
+    html += `<span class="m-count" style="width:52px">${count}/${desiredLabel}回</span>`;
+    html += `<span style="font-size:10px;flex-shrink:0;white-space:nowrap">${statusHtml}</span>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // 希望日一覧: スクショ/OCRから読み取った内容を「〜以外OK」のような分かりにくい表現ではなく、
+  // 実際にOKな日付をそのまま一覧表示する（画面上ですぐに読み取り内容を検証できるようにするため）
+  html += `<div class="stats-card">`;
+  html += `<h3><span class="icon">📅</span>希望日一覧</h3>`;
+  // (v3) カレンダーの＋ボタンから直接名前だけで追加した人（isManualAdd）は、
+  // 本人が回答した希望日ではなく「配置された1枠」しか持っていないため、
+  // ここには出さない（本当にテキスト/スクショで希望日を回答した人だけを表示する）
+  MEMBERS.filter(m => !m.isManualAdd).forEach(m => {
+    html += `<div style="font-size:11px;padding:4px 0;border-bottom:1px solid #f5f5f5">`;
+    html += `<b>${m.name}</b>`;
+    const unionDays = allAvailableDays(m);
+    if (m.status === '保留' || m.status === '解析不能') {
+      html += ` <span style="color:#f0a500">⚠️ ${m.aiComment || '要確認'}</span>`;
+    } else if (unionDays.length === 0) {
+      html += ` <span style="color:#999">希望日データなし</span>`;
+    } else if (m.limitToOneDay) {
+      // 「4日か5日のうちいずれか1日だけ」のように、可能日は複数あるが実際の
+      // 希望回数は1回だけの人は、可能日を「・」ではなく「か」でつなぎ、
+      // 「いずれか1日」であることを明記する（両日とも配置されたと誤解されないため）
+      html += `：${unionDays.join('か')}日　いずれか1日 OK`;
+    } else {
+      // 午前・午後で可能日が異なる場合は分けて表示する。両方同じ日リストなら
+      // （＝従来通り終日可能）まとめて1行で表示する
+      const amStr = (m.availableAm || []).join('・');
+      const pmStr = (m.availablePm || []).join('・');
+      if (amStr === pmStr) {
+        html += `：${amStr || 'なし'}日 OK`;
+      } else {
+        html += `：午前 ${amStr || 'なし'}日／午後 ${pmStr || 'なし'}日`;
+      }
+    }
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // 注: 「メンバー状況」パネル（確定／保留の人数・保留メンバー一覧）は、上の
+  // 「希望日一覧」パネルで各メンバーの保留状態・要確認コメントがすでに表示されて
+  // おり内容が重複するため、統合の上で削除した。
+
+  // Warnings
+  html += `<div class="stats-card">`;
+  html += `<h3><span class="icon">🚨</span>警告・確認事項</h3>`;
+  const allWarnings = collectAllWarnings();
+  if (allWarnings.length === 0) {
+    html += `<div class="no-warn">✅ 問題なし</div>`;
+  } else {
+    html += `<div class="warnings-list">`;
+    allWarnings.slice(0, 15).forEach(w => {
+      html += `<div class="warn-item ${w.level}">${w.message}</div>`;
+    });
+    if (allWarnings.length > 15) {
+      html += `<div style="font-size:11px;color:#999;text-align:center">他 ${allWarnings.length - 15} 件...</div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  panel.innerHTML = html;
+}
+
+function collectAllWarnings() {
+  const warnings = [];
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const slots = sessionMode === 1 ? ['am'] : ['am', 'pm'];
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const amMembers = getSlot(day, 'am');
+    const pmMembers = sessionMode === 2 ? getSlot(day, 'pm') : [];
+    if (amMembers.length === 0 && pmMembers.length === 0) continue; // 未配置の日はスキップ
+
+    // (v3) 人数不足はもうエラー・警告として扱わない、との要望によりチェックを削除した
+
+    slots.forEach(slot => {
+      const members = getSlot(day, slot);
+      const label = sessionMode === 1 ? '作業' : (slot === 'am' ? '午前' : '午後');
+
+      members.forEach(id => {
+        const m = getMember(id);
+        if (!m) return;
+        if (isNgDay(m, day, slot)) {
+          warnings.push({ level: 'error', message: `🔴 ${currentMonth}/${day} ${label}: ${m.name} はNG日` });
+        } else if (!isAvailable(m, day, slot)) {
+          warnings.push({ level: 'error', message: `🔴 ${currentMonth}/${day} ${label}: ${m.name} 希望していない枠` });
+        }
+        if (m.status === '保留') {
+          warnings.push({ level: 'warn', message: `⚠️ ${currentMonth}/${day} ${label}: ${m.name} は保留（要確認）` });
+        }
+      });
+
+    });
+  }
+
+  return warnings;
+}
+
+// ========================
+// DRAG & DROP
+// ========================
+function setupDragDrop() {
+  // Already handled via inline event handlers
+}
+
+function handleDragStart(event) {
+  const memberId = parseInt(event.target.dataset.memberId);
+  const day = parseInt(event.target.dataset.day);
+  const slot = event.target.dataset.slot;
+  dragState = { memberId, day, slot };
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', memberId);
+  setTimeout(() => { if (event.target) event.target.style.opacity = '0.4'; }, 0);
+}
+
+function handleDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  event.currentTarget.classList.add('drag-over');
+}
+
+function handleDragLeave(event) {
+  event.currentTarget.classList.remove('drag-over');
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  event.stopPropagation(); // 親要素（日付セル）側の作業日ドラッグ処理に伝播させない
+  event.currentTarget.classList.remove('drag-over');
+  if (!dragState) return;
+
+  const toDay = parseInt(event.currentTarget.dataset.day);
+  const toSlot = event.currentTarget.dataset.slot;
+  const { memberId, day: fromDay, slot: fromSlot } = dragState;
+
+  // Don't drop on same slot
+  if (toDay === fromDay && toSlot === fromSlot) return;
+
+  // Check target slot is not locked
+  if (isLocked(toDay, toSlot)) return;
+
+  // Remove from source
+  if (!isLocked(fromDay, fromSlot)) {
+    const srcArr = getSlot(fromDay, fromSlot).filter(id => id !== memberId);
+    setSlot(fromDay, fromSlot, srcArr);
+  }
+
+  // Add to target if not already there
+  const destArr = getSlot(toDay, toSlot);
+  if (!destArr.includes(memberId)) {
+    destArr.push(memberId);
+    setSlot(toDay, toSlot, destArr);
+  }
+
+  dragState = null;
+  render();
+}
+
+// 作業日そのものをドラッグ＆ドロップで別の日へ移動する（手動でずらしたい場合用）。
+// 日付セル自体には、①作業日チェック(✓)のドラッグ（作業日をまるごと移動）と
+// ②メンバーチップのドラッグ（そのメンバーだけを別の日へ移動。移動先がまだ
+// 作業日でなければ自動的に作業日にする）の両方を受け付ける。
+let workdayDragState = null;
+
+function handleWorkdayDragStart(event, day) {
+  workdayDragState = { day };
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', 'workday:' + day);
+  setTimeout(() => { if (event.target) event.target.style.opacity = '0.4'; }, 0);
+}
+
+function handleDayCellDragOver(event) {
+  if (!workdayDragState && !dragState) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  event.currentTarget.classList.add('workday-drag-over');
+}
+
+function handleDayCellDragLeave(event) {
+  event.currentTarget.classList.remove('workday-drag-over');
+}
+
+function handleDayCellDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('workday-drag-over');
+  const toDay = parseInt(event.currentTarget.dataset.day);
+
+  // ケース1: メンバーチップをこの日にドロップ（.slotの外、日付セルの余白にドロップされた場合。
+  // .slot側は既にstopPropagation済みなので、ここに来るのは作業日でない日にドロップした場合が中心）
+  if (dragState) {
+    const { memberId, day: fromDay, slot: fromSlot } = dragState;
+    dragState = null;
+    if (toDay === fromDay) return;
+    if (!workDays.has(toDay)) {
+      workDays.add(toDay);
+      updateWorkdayCount();
+    }
+    const toSlot = fromSlot;
+    if (isLocked(toDay, toSlot)) {
+      alert(`${currentMonth}月${toDay}日（${toSlot === 'am' ? '午前' : '午後'}）はロックされています`);
+      render();
+      return;
+    }
+    if (!isLocked(fromDay, fromSlot)) {
+      const srcArr = getSlot(fromDay, fromSlot).filter(id => id !== memberId);
+      setSlot(fromDay, fromSlot, srcArr);
+    }
+    const destArr = getSlot(toDay, toSlot);
+    if (!destArr.includes(memberId)) {
+      destArr.push(memberId);
+      setSlot(toDay, toSlot, destArr);
+    }
+    render();
+    return;
+  }
+
+  // ケース2: 作業日チェック(✓)自体をこの日にドロップ（作業日を丸ごと移動）
+  if (workdayDragState) {
+    const fromDay = workdayDragState.day;
+    workdayDragState = null;
+    if (toDay === fromDay) return;
+    if (workDays.has(toDay)) { alert(`${currentMonth}月${toDay}日はすでに作業日です`); return; }
+
+    // 移動先を作業日にする
+    workDays.add(toDay);
+
+    // 移動元の配置・ロックは新しい日へそのまま引き継ぐ（配置し直す手間を省く）
+    schedule[toDay] = schedule[fromDay] || { am: [], pm: [] };
+    locked[toDay] = locked[fromDay] || {};
+
+    // 移動元を作業日から外す
+    workDays.delete(fromDay);
+    schedule[fromDay] = { am: [], pm: [] };
+    locked[fromDay] = {};
+
+    updateWorkdayCount();
+    render();
+  }
+}
+
+// ========================
+// MODAL (member picker)
+// ========================
+function openModal(day, slot) {
+  modalState = { day, slot };
+  const label = slot === 'am' ? '午前' : '午後';
+  document.getElementById('modal-title').textContent =
+    `${currentMonth}月${day}日（${label}）にメンバーを追加`;
+
+  const currentMembers = getSlot(day, slot);
+  const dow = new Date(currentYear, currentMonth - 1, day).getDay();
+
+  let html = '';
+  MEMBERS.forEach(m => {
+    const isAlready = currentMembers.includes(m.id);
+    const isUnavail = isNgDay(m, day, slot) || !isAvailable(m, day, slot);
+    let rowClass = 'modal-row';
+    if (isAlready) rowClass += ' already';
+    else if (isUnavail) rowClass += ' unavailable';
+
+    const prefLabel = timePrefLabel(m);
+    const statusLabel = m.status === '保留' ? ' <span style="color:#f0a500">⚠️保留</span>' : '';
+
+    const onclick = isAlready || isUnavail ? '' :
+      `onclick="pickMember(${m.id})"`;
+
+    let reason = '';
+    if (isAlready) reason = '（配置済み）';
+    else if (isNgDay(m, day, slot)) reason = '（NG日）';
+    else if (!isAvailable(m, day, slot)) reason = `（${slot === 'am' ? '午前' : '午後'}は希望なし）`;
+
+    const slotDays = slot === 'am' ? m.availableAm : m.availablePm;
+    const okDaysLabel = slotDays.length
+      ? `<div style="font-size:10px;color:#888;width:100%">${slot === 'am' ? '午前' : '午後'}OK日: ${slotDays.join('・')}日</div>`
+      : '';
+
+    html += `<div class="${rowClass}" ${onclick} style="flex-wrap:wrap">`;
+    html += `<span class="m-name" style="width:auto;flex:1">${m.name}</span>`;
+    html += `<span class="m-pref">${prefLabel}${statusLabel}</span>`;
+    if (reason) html += `<span style="font-size:10px;color:#aaa">${reason}</span>`;
+    html += `<span class="m-delete" onclick="event.stopPropagation(); deleteMemberEntirely(${m.id})" title="「${escHtml(m.name)}」を名簿から完全に削除">🗑</span>`;
+    html += okDaysLabel;
+    html += `</div>`;
+  });
+
+  document.getElementById('modal-list').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function pickMember(memberId) {
+  if (!modalState) return;
+  addMember(modalState.day, modalState.slot, memberId);
+  closeModal();
+}
+
+// 名簿（スクショ解析結果）に載っていない人をその場で名前入力だけで追加する。
+// スクショの取り込み直しを待たずに、新しく参加することになった人をすぐ
+// その日の枠に入れられるようにするための入口。
+// 既存メンバーと同姓同名ならその人を使い、いなければ新規メンバーとして
+// MEMBERSに追加する（希望日データは今回入れた枠の分だけ持たせる。他の日に
+// ついては「希望していない枠」警告が出るので、必要ならメンバー本人の
+// 可能日をスクショ取り込みや今後の対応で追記していく想定）。
+function addFreeTextMember() {
+  if (!modalState) return;
+  const input = document.getElementById('modal-freetext-input');
+  const nameRaw = input.value.trim();
+  if (!nameRaw) return;
+  const { day, slot } = modalState;
+
+  const norm = s => s.replace(/\s|　/g, '');
+  let member = MEMBERS.find(m => norm(m.name) === norm(nameRaw));
+
+  if (!member) {
+    const newId = MEMBERS.reduce((max, m) => Math.max(max, m.id), 0) + 1;
+    member = {
+      id: newId,
+      name: nameRaw,
+      role: '一般',
+      status: '確定',
+      availableAm: slot === 'am' ? [day] : [],
+      availablePm: slot === 'pm' ? [day] : [],
+      unavailableAm: [],
+      unavailablePm: [],
+      aiComment: '手動で追加されたメンバー（希望日は入力済みの枠のみ）',
+      // (v3) カレンダーから直接「＋」で追加した人は、本人が回答した希望日
+      // ではなく「たまたま配置された1枠」しかavailableAm/PMに入らない。
+      // これを「希望日一覧」パネルにそのまま出すと、テキスト/スクショで
+      // 回答した本物の希望日と見分けがつかなくなってしまうため、手動追加で
+      // あることが分かるようフラグを持たせ、希望日一覧では除外する。
+      isManualAdd: true
+    };
+    MEMBERS.push(member);
+  } else if (slot === 'am' && !member.availableAm.includes(day)) {
+    member.availableAm = [...member.availableAm, day];
+  } else if (slot === 'pm' && !member.availablePm.includes(day)) {
+    member.availablePm = [...member.availablePm, day];
+  }
+
+  addMember(day, slot, member.id);
+  input.value = '';
+  closeModal();
+}
+
+function closeModal(event) {
+  if (event && event.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+  modalState = null;
+  const input = document.getElementById('modal-freetext-input');
+  if (input) input.value = '';
+}
+
+// (v3) 誤って入力してしまった名前（typo・文字化け等）を名簿から完全に削除する。
+// これまではカレンダーの枠からチップの「×」で外すことはできても、名簿
+// （MEMBERS）自体からは消えず、参加回数パネルに「0/1回 未配置」のような
+// おかしなデータがいつまでも残ってしまっていた。この関数は名簿からも、
+// 配置済みの全ての日・枠からも、そのメンバーを完全に取り除く。
+function deleteMemberEntirely(memberId) {
+  const member = getMember(memberId);
+  if (!member) return;
+  if (!confirm(`「${member.name}」を名簿から完全に削除しますか？\nこの人が配置されている枠からも削除されます。この操作は元に戻せません。`)) return;
+
+  MEMBERS = MEMBERS.filter(m => m.id !== memberId);
+
+  Object.keys(schedule).forEach(day => {
+    ['am', 'pm'].forEach(slot => {
+      if (schedule[day] && schedule[day][slot]) {
+        schedule[day][slot] = schedule[day][slot].filter(id => id !== memberId);
+      }
+    });
+  });
+
+  // モーダルを開いたままの場合は一覧を再描画する
+  if (modalState) openModal(modalState.day, modalState.slot);
+  render();
+}
+
+// ========================
+// MONTH NAVIGATION
+// ========================
+// localStorage wrapper（ブラウザ設定によっては使えない場合あり）
+const notesStore = {};
+function saveNotes(key, val) {
+  notesStore[key] = val;
+  try { localStorage.setItem(key, val); } catch(e) {}
+}
+function loadNotes(key) {
+  if (notesStore[key] !== undefined) return notesStore[key];
+  try { return localStorage.getItem(key) || ''; } catch(e) { return ''; }
+}
+
+// ========================
+// 作業状態の自動保存・復元
+// ========================
+// 画面をリロードしたり、月を切り替えて後で戻ってきたりすると、それまで入力した
+// 名簿（MEMBERS）やカレンダーの配置（schedule/locked/workDays等）が跡形もなく
+// 消えてしまう（＝どこにも保存されていなかった）という不具合があった。ここでは
+// render()が呼ばれるたびに主要な状態をlocalStorageへ自動保存し、ページを開いた
+// ときや月を切り替えたときに自動で復元することで、「作業途中のものが消える」を
+// 防ぐ。「クリア」ボタン（clearAssignments）は今まで通り明示的に内容を空にする
+// 操作なので、そこはあえて自動復元の対象から外さず、空にした状態がそのまま
+// 保存される（＝クリアすればクリアされたままになる）ようにしている。
+const MEMBERS_STORAGE_KEY = 'hananokai_members_v1';
+const SESSION_MODE_STORAGE_KEY = 'hananokai_sessionMode_v1';
+function monthStateKey(y, m) { return `hananokai_monthstate_${y}_${m}`; }
+
+function saveFullState() {
+  try { localStorage.setItem(MEMBERS_STORAGE_KEY, JSON.stringify(MEMBERS)); } catch(e) {}
+  try { localStorage.setItem(SESSION_MODE_STORAGE_KEY, String(sessionMode)); } catch(e) {}
+  try {
+    const data = { schedule, locked, workDays: [...workDays], dayTargets, disabledSlots };
+    localStorage.setItem(monthStateKey(currentYear, currentMonth), JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadMonthState(y, m) {
+  try {
+    const raw = localStorage.getItem(monthStateKey(y, m));
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+// ページを開いた最初の1回だけ呼ぶ。保存済みの状態があれば、ファイルに書かれた
+// 初期データより優先して復元する（保存済みデータが無ければ何もせず、ファイルの
+// 初期データ・空の配置のままになる）。
+function restoreStateOnLoad() {
+  try {
+    const rawMembers = localStorage.getItem(MEMBERS_STORAGE_KEY);
+    if (rawMembers) {
+      const parsedMembers = JSON.parse(rawMembers);
+      if (Array.isArray(parsedMembers) && parsedMembers.length) MEMBERS = parsedMembers;
+    }
+  } catch(e) {}
+  try {
+    const rawMode = localStorage.getItem(SESSION_MODE_STORAGE_KEY);
+    if (rawMode === '1' || rawMode === '2') sessionMode = parseInt(rawMode, 10);
+  } catch(e) {}
+  const saved = loadMonthState(currentYear, currentMonth);
+  if (saved) {
+    schedule = saved.schedule || {};
+    locked = saved.locked || {};
+    workDays = new Set(saved.workDays || []);
+    dayTargets = saved.dayTargets || {};
+    disabledSlots = saved.disabledSlots || {};
+  }
+}
+
+// ========================
+// 一時保存（ファイルへの手動エクスポート／読み込み）
+// ========================
+// 13章の自動保存はこのHTMLファイルを開いたブラウザ・端末にしか残らない
+// （localStorageはファイルのパスごとに別々に保存されるため、同じファイルを
+// 別の場所にコピーしたり、別のパソコンで開いたりすると引き継がれない）。
+// 「途中の内容をファイルとして手元に保存し、あとで読み込みたい」という要望
+// に対応するため、現在の名簿・カレンダー配置・作業日・連絡事項等をひとつの
+// JSONファイルとして書き出し／読み込みできるようにした。
+function exportSaveFile() {
+  let notices = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.indexOf('notices_') === 0 || key === 'sessionMonthNote')) {
+        notices[key] = localStorage.getItem(key);
+      }
+    }
+  } catch(e) {}
+
+  const data = {
+    savedFormatVersion: 1,
+    savedAt: new Date().toISOString(),
+    currentYear, currentMonth,
+    MEMBERS, schedule, locked,
+    workDays: [...workDays],
+    dayTargets, disabledSlots, sessionMode,
+    notices
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  a.href = url;
+  a.download = `花の会予定表_一時保存_${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importSaveFileTrigger() {
+  const input = document.getElementById('save-file-input');
+  if (input) input.click();
+}
+
+function importSaveFileChange(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch(e) {
+      alert('ファイルの読み込みに失敗しました（JSON形式が正しくありません）。');
+      return;
+    }
+    if (!data || typeof data !== 'object' || !Array.isArray(data.MEMBERS)) {
+      alert('このファイルは花の会予定表の一時保存データではないようです。');
+      return;
+    }
+    const savedAtLabel = data.savedAt ? new Date(data.savedAt).toLocaleString('ja-JP') : '不明';
+    if (!confirm(`保存日時: ${savedAtLabel}\nこの内容を読み込み、現在の画面の内容を置き換えます。よろしいですか？`)) return;
+
+    MEMBERS = data.MEMBERS || [];
+    schedule = data.schedule || {};
+    locked = data.locked || {};
+    workDays = new Set(data.workDays || []);
+    dayTargets = data.dayTargets || {};
+    disabledSlots = data.disabledSlots || {};
+    sessionMode = (data.sessionMode === 2) ? 2 : 1;
+    if (data.currentYear) currentYear = data.currentYear;
+    if (data.currentMonth) currentMonth = data.currentMonth;
+
+    if (data.notices) {
+      try {
+        Object.keys(data.notices).forEach(key => localStorage.setItem(key, data.notices[key]));
+      } catch(e) {}
+    }
+
+    render();
+    updateWorkdayCount();
+    updateSessionModeUI();
+    const monthInput = document.getElementById('month-input');
+    if (monthInput) monthInput.value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    const noticesInput = document.getElementById('notices-text');
+    if (noticesInput) noticesInput.value = loadNotes(`notices_${currentYear}_${currentMonth}`);
+    const noteInput = document.getElementById('month-note-input');
+    if (noteInput) noteInput.value = loadNotes('sessionMonthNote');
+
+    alert('読み込みが完了しました。');
+  };
+  reader.onerror = () => alert('ファイルの読み込みに失敗しました。');
+  reader.readAsText(file);
+}
+
+function setYearMonth(value) {
+  const parts = value.split('-');
+  if (parts.length !== 2) return;
+  const y = parseInt(parts[0]);
+  const m = parseInt(parts[1]);
+  if (isNaN(y) || isNaN(m) || m < 1 || m > 12) return;
+
+  saveNotes(`notices_${currentYear}_${currentMonth}`,
+    document.getElementById('notices-text').value);
+
+  currentYear = y;
+  currentMonth = m;
+  // 以前はここで配置・ロック・作業日を必ず空に戻していたが、そのせいで
+  // 「別の月を見てからまた戻ってくると、それまでの配置が消えている」という
+  // 不具合になっていた。保存済みの状態があればそれを復元し、無い月（初めて
+  // 開く月）だけ空の状態にする。
+  const saved = loadMonthState(currentYear, currentMonth);
+  if (saved) {
+    schedule = saved.schedule || {};
+    locked = saved.locked || {};
+    workDays = new Set(saved.workDays || []);
+    dayTargets = saved.dayTargets || {};
+    disabledSlots = saved.disabledSlots || {};
+  } else {
+    schedule = {};
+    locked = {};
+    workDays = new Set();
+    dayTargets = {};
+    disabledSlots = {};
+  }
+  // sessionMode（1回制/2回制）は月に連動させず、手動で選んだ状態を維持する
+  render();
+  updateWorkdayCount();
+  updateSessionModeUI();
+
+  document.getElementById('notices-text').value =
+    loadNotes(`notices_${currentYear}_${currentMonth}`);
+}
+
+function changeMonth(delta) {
+  saveNotes(`notices_${currentYear}_${currentMonth}`,
+    document.getElementById('notices-text').value);
+
+  currentMonth += delta;
+  if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+  if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+  // setYearMonthと同じ理由で、保存済みの状態があれば復元する（無ければ空にする）
+  const saved = loadMonthState(currentYear, currentMonth);
+  if (saved) {
+    schedule = saved.schedule || {};
+    locked = saved.locked || {};
+    workDays = new Set(saved.workDays || []);
+    dayTargets = saved.dayTargets || {};
+    disabledSlots = saved.disabledSlots || {};
+  } else {
+    schedule = {};
+    locked = {};
+    workDays = new Set();
+    dayTargets = {};
+    disabledSlots = {};
+  }
+  // sessionMode（1回制/2回制）は月に連動させず、手動で選んだ状態を維持する
+  render();
+  updateWorkdayCount();
+  updateSessionModeUI();
+
+  document.getElementById('notices-text').value =
+    loadNotes(`notices_${currentYear}_${currentMonth}`);
+}
+
+// ========================
+// SCREENSHOT PANEL
+// ========================
+let screenshots = []; // { id, url, name, ocrText, ocrStatus: 'idle'|'running'|'done'|'error' }
+let scIdCounter = 0;
+
+function toggleScreenshotPanel() {
+  const panel = document.getElementById('screenshot-panel');
+  const btn = document.getElementById('btn-sc');
+  const isOpen = panel.classList.toggle('open');
+  btn.classList.toggle('active', isOpen);
+  if (isOpen) {
+    setTimeout(() => {
+      const pa = document.getElementById('paste-area');
+      if (pa) pa.focus();
+    }, 150);
+  }
+}
+
+function handlePasteArea(event) {
+  event.preventDefault();
+  const items = event.clipboardData && event.clipboardData.items;
+  if (!items) return;
+  let found = false;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith('image/')) {
+      const file = items[i].getAsFile();
+      if (file) { addScreenshot(file); found = true; }
+    }
+  }
+  // テキストとして貼られた場合は何もしない（中身をリセット）
+  resetPasteArea();
+}
+
+function clearPasteArea(event) {
+  // contenteditable にテキストが入力されたらリセット
+  resetPasteArea();
+}
+
+function resetPasteArea() {
+  const pa = document.getElementById('paste-area');
+  if (!pa) return;
+  pa.innerHTML = `
+    <div class="paste-area-icon">📋</div>
+    <div class="paste-area-label">ここをクリックして Ctrl+V で貼り付け</div>
+    <div class="paste-area-hint">✅ 準備OK — Ctrl+V を押してください</div>`;
+}
+
+function addScreenshot(file) {
+  const looksLikeImage = (file.type && file.type.startsWith('image/')) ||
+    /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(file.name || '');
+  if (!looksLikeImage) {
+    alert('画像ファイルではないため追加できませんでした: ' + (file.name || '') + (file.type ? ' (' + file.type + ')' : ''));
+    return;
+  }
+  const reader = new FileReader();
+  reader.onerror = () => {
+    alert('画像の読み込みに失敗しました: ' + (file.name || ''));
+  };
+  reader.onload = e => {
+    const id = ++scIdCounter;
+    screenshots.push({ id, url: e.target.result, name: file.name, ocrText: '', ocrStatus: 'idle' });
+    renderScreenshots();
+    // ギャラリーが見えているか確認できるようパネルを開いた状態にする
+    const panel = document.getElementById('screenshot-panel');
+    if (panel && !panel.classList.contains('open')) {
+      panel.classList.add('open');
+      const btn = document.getElementById('btn-sc');
+      if (btn) btn.classList.add('active');
+    }
+    // 貼り付け・ドラッグ＆ドロップ・ファイル選択のどの方法で追加した場合でも、
+    // ボタンを押さなくても自動的に文字起こしを開始する
+    // （「毎回スクショの内容を文字起こししてほしい」という要望のため）
+    runOCR(id);
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderScreenshots() {
+  const gallery = document.getElementById('screenshot-gallery');
+  if (screenshots.length === 0) {
+    gallery.innerHTML = '<span class="sc-empty">まだ画像がありません</span>';
+    return;
+  }
+  gallery.innerHTML = screenshots.map(sc => {
+    const ocrControls = sc.ocrStatus === 'idle'
+      ? `<button class="sc-ocr-btn" onclick="runOCR(${sc.id})">📝 文字起こし</button>`
+      : sc.ocrStatus === 'running'
+        ? `<span class="sc-ocr-progress" id="sc-prog-${sc.id}">⏳ 解析中...</span>`
+        : sc.ocrStatus === 'done'
+          ? `<span class="sc-ocr-done">✅ 文字起こし完了</span><button class="sc-ocr-btn" onclick="runOCR(${sc.id})">再実行</button>`
+          : `<span style="color:#f88;font-size:11px">⚠️ エラー</span><button class="sc-ocr-btn" onclick="runOCR(${sc.id})">再試行</button>`;
+
+    // 文字起こしの生テキストは、最終確認は「全スクショをまとめて反映」を押した後に
+    // 出る大きなレビュー画面で行うため、ここでは普段は畳んでおき、うまく読み取れない
+    // ときだけ開いて手直しできるようにする（常に表示すると情報量が多すぎるため）
+    const textArea = (sc.ocrStatus === 'done' || sc.ocrStatus === 'error')
+      ? `<details class="sc-ocr-details">
+           <summary>文字起こし結果を確認・修正する</summary>
+           <textarea class="sc-ocr-text" id="sc-text-${sc.id}"
+             oninput="screenshots.find(s=>s.id===${sc.id}).ocrText=this.value"
+             placeholder="文字起こし結果（編集可）">${escHtml(sc.ocrText)}</textarea>
+           <div class="sc-reminder">💬 うまく読み取れない場合は、上のテキストを直接修正してください。書き方の例:「名前」の行の次の行に「作業できる日　5日、12日」または「作業できない日　3日」のように書きます。</div>
+         </details>`
+      : '';
+
+    return `<div class="sc-card" id="sc-card-${sc.id}">
+      <div class="sc-card-left">
+        <img src="${sc.url}" onclick="openLightbox('${sc.url}')" title="クリックで拡大">
+        <button class="sc-del" onclick="deleteScreenshot(${sc.id})" title="削除">✕</button>
+      </div>
+      <div class="sc-card-right">
+        <div class="sc-card-name">${escHtml(sc.name || '画像')}</div>
+        <div class="sc-ocr-btns">${ocrControls}</div>
+        ${textArea}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function deleteScreenshot(id) {
+  screenshots = screenshots.filter(s => s.id !== id);
+  renderScreenshots();
+}
+
+function clearScreenshots() {
+  if (screenshots.length === 0) return;
+  if (confirm('貼り付けた画像を全て削除しますか？')) {
+    screenshots = [];
+    renderScreenshots();
+  }
+}
+
+// ========================
+// OCR
+// ========================
+let tesseractLoaded = false;
+
+async function loadTesseract() {
+  if (tesseractLoaded || typeof Tesseract !== 'undefined') {
+    tesseractLoaded = true;
+    return true;
+  }
+  return new Promise(resolve => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js';
+    s.onload = () => { tesseractLoaded = true; resolve(true); };
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
+// グレースケールのヒストグラムから、文字と背景を最もよく分離できる
+// しきい値を自動で求める（大津の二値化）。画面の明るさ・配色（ダーク
+// モード等）によらず、その画像に合ったしきい値で白黒化できる。
+function otsuThreshold(hist, total) {
+  let sum = 0;
+  for (let t = 0; t < 256; t++) sum += t * hist[t];
+  let sumB = 0, wB = 0, varMax = -1, threshold = 128;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = total - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+    const varBetween = wB * wF * (mB - mF) * (mB - mF);
+    if (varBetween > varMax) { varMax = varBetween; threshold = t; }
+  }
+  return threshold;
+}
+
+// 画像をOCRにかける前に読み取りやすい形へ変換する。
+// LINEのトーク画面のスクショは文字が小さく、吹き出しの背景色もあるため、
+// 元画像のままではTesseractの認識精度が低い（文字化けしやすい）。ここで
+//   1) 拡大する（文字が小さいスクショほど恩恵が大きい）
+//   2) 大津の二値化で白黒はっきりさせる（コンピュータ生成の文字は
+//      二値化との相性が良く、影・グラデーション・配色の影響を受けにくい）
+// をしてから渡すことで認識精度を上げる。
+// 注: 以前は左端のアイコン写真の帯を切り落とす処理も入れていたが、
+// 端末やスクショの余白の取り方によっては本文の1文字目まで切り取って
+// しまい（「あけみ」→「けみ」、「Keiko」→「eiko」等）、かえって精度が
+// 落ちる実害が確認されたため廃止した。左端の切り取りは行わない。
+// それでも完璧ではないため、うまく読めない場合はテキストを直接修正して
+// ください。
+function preprocessImageForOCR(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const srcW = img.width;
+        const srcH = img.height;
+
+        const scale = srcW < 900 ? 2.2 : (srcW < 1400 ? 1.6 : 1.1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(srcW * scale));
+        canvas.height = Math.max(1, Math.round(srcH * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, srcW, srcH, 0, 0, canvas.width, canvas.height);
+
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imgData.data;
+        const pixelCount = d.length / 4;
+        const gray = new Float64Array(pixelCount);
+        const hist = new Array(256).fill(0);
+        for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+          const g = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+          gray[p] = g;
+          hist[Math.min(255, Math.max(0, Math.round(g)))]++;
+        }
+        const th = otsuThreshold(hist, pixelCount);
+        for (let p = 0, i = 0; p < pixelCount; p++, i += 4) {
+          const v = gray[p] >= th ? 255 : 0;
+          d[i] = d[i + 1] = d[i + 2] = v;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) {
+        // 前処理に失敗した場合は元画像のままOCRにかける（失敗させないための保険）
+        resolve(url);
+      }
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+}
+
+async function runOCR(scId) {
+  const sc = screenshots.find(s => s.id === scId);
+  if (!sc) return;
+
+  sc.ocrStatus = 'running';
+  sc.ocrText = '';
+  renderScreenshots();
+
+  // 前回実行時のワーカー・結果が使い回されて古いテキストが表示されることがあるため、
+  // 毎回このスクショ専用の新しいワーカーを作成し、認識後に必ず破棄する
+  let worker = null;
+  try {
+    const ok = await loadTesseract();
+    if (!ok || typeof Tesseract === 'undefined') {
+      throw new Error('OCRライブラリを読み込めませんでした。インターネット接続を確認してください。');
+    }
+
+    worker = await Tesseract.createWorker('jpn', 1, {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          const el = document.getElementById(`sc-prog-${scId}`);
+          if (el) el.textContent = `⏳ ${Math.round(m.progress * 100)}%...`;
+        }
+      }
+    });
+    // LINEノートはアイコン写真＋可変サイズの文字（氏名は大きく太字、本文は
+    // 標準、時刻は小さいグレー）が縦1列に並ぶレイアウトのため、「複数サイズの
+    // 文字が単一の縦カラムに並ぶ」設定の方が自動レイアウト解析より文字化けしにくい
+    try { await worker.setParameters({ tessedit_pageseg_mode: '4' }); } catch (e) { /* 古いバージョン等で失敗しても無視 */ }
+
+    const preprocessedUrl = await preprocessImageForOCR(sc.url);
+    let result = await worker.recognize(preprocessedUrl);
+    let text = (result.data.text || '').trim();
+    let bestLen = text.replace(/\s/g, '').length;
+
+    // 前処理した画像でほとんど文字が拾えなかった場合は、元画像でもう一度試す
+    // （画面の配色や余白の取り方によっては、切り抜き・二値化がかえって
+    // 邪魔になることがあるため、より多く文字を拾えた方を採用する）
+    if (bestLen < 8) {
+      const retryResult = await worker.recognize(sc.url);
+      const retryText = (retryResult.data.text || '').trim();
+      const retryLen = retryText.replace(/\s/g, '').length;
+      if (retryLen > bestLen) { text = retryText; bestLen = retryLen; }
+    }
+
+    sc.ocrText = text;
+    sc.ocrStatus = 'done';
+
+  } catch (err) {
+    sc.ocrStatus = 'error';
+    sc.ocrText = 'エラー: ' + err.message;
+  } finally {
+    if (worker) {
+      try { await worker.terminate(); } catch (e) { /* ignore */ }
+    }
+  }
+
+  renderScreenshots();
+  // 注: ここでは自動的に「解析してデータ更新」は行わない。
+  // 複数枚のスクショを貼った場合、1枚ごとに自動反映するとメンバー一覧が
+  // その1枚の内容だけで毎回まるごと作り直されてしまい、先に貼った分の
+  // 内容が消えてしまう（＝複数スクショに対応できなくなる）ため、
+  // 反映は「全スクショをまとめて反映」ボタンでまとめて1回だけ行う。
+}
+
+// ========================
+// 解析結果レビューモーダル
+// ========================
+// ブラウザ標準のconfirm()は表示領域が小さく、メンバーが多いと最後まで
+// スクロールしても読み切れない・全体が見えないという不具合があったため、
+// 画面いっぱいに大きく表示できる専用モーダルに置き換えた。
+let pendingParsedMembers = null;
+
+// (v3で変更) 反映は「名前が一致する人は更新・一致しない新しい名前は追加」の
+// マージ方式になったため（applyParsedMembers参照）、「削除されるメンバー」の
+// 警告表示は廃止した。代わりに、今回の内容が既存メンバーの更新なのか、
+// 初めて登録される人なのかが一目で分かるよう「（新規）」「（更新）」の
+// バッジを付ける。
+function buildReviewHtml(parsed) {
+  const norm = s => s.replace(/\s|　/g, '');
+  let html = '';
+  parsed.forEach(p => {
+    const isNew = !MEMBERS.some(m => norm(m.name) === norm(p.name));
+    html += `<div class="review-member-card${isNew ? ' is-new' : ''}">`;
+    html += `<div class="rm-name">${escHtml(p.name)}${isNew ? '<span class="rm-new-badge">（新規）</span>' : '<span class="rm-new-badge" style="background:#888">（更新）</span>'}</div>`;
+    html += `<div class="rm-detail">`;
+    const amStr = (p.availableAm || []).join(', ');
+    const pmStr = (p.availablePm || []).join(', ');
+    if (amStr === pmStr) {
+      html += `可能日（午前・午後とも）: ${amStr ? escHtml(amStr) + '日' : 'なし'}<br>`;
+    } else {
+      html += `午前の可能日: ${amStr ? escHtml(amStr) + '日' : 'なし'}<br>`;
+      html += `午後の可能日: ${pmStr ? escHtml(pmStr) + '日' : 'なし'}<br>`;
+    }
+    const amNgStr = (p.unavailableAm || []).join(', ');
+    const pmNgStr = (p.unavailablePm || []).join(', ');
+    if (amNgStr) html += `午前NG日: ${escHtml(amNgStr)}日<br>`;
+    if (pmNgStr) html += `午後NG日: ${escHtml(pmNgStr)}日<br>`;
+    html += `状態: ${escHtml(p.status)}`;
+    html += `</div></div>`;
+  });
+  return html;
+}
+
+function openReviewModal(parsed, sub) {
+  pendingParsedMembers = parsed;
+  const subEl = document.getElementById('review-modal-sub');
+  if (subEl) subEl.textContent = sub;
+  const bodyEl = document.getElementById('review-modal-body');
+  if (bodyEl) bodyEl.innerHTML = buildReviewHtml(parsed);
+  document.getElementById('review-modal-overlay').classList.add('open');
+}
+
+function closeReviewModal(event) {
+  if (event && event.target !== document.getElementById('review-modal-overlay')) return;
+  document.getElementById('review-modal-overlay').classList.remove('open');
+  pendingParsedMembers = null;
+}
+
+function confirmApplyParsedMembers() {
+  if (!pendingParsedMembers) return;
+  applyParsedMembers(pendingParsedMembers);
+  pendingParsedMembers = null;
+  document.getElementById('review-modal-overlay').classList.remove('open');
+
+  // 反映済みのスクショはここで消す。残したままにすると、次にスクショを
+  // 追加して「まとめて反映」を押したときに、今回すでに取り込んだ古い
+  // 文字起こし結果までもう一度混ざってしまい（＝古い情報が残り続ける）、
+  // 同じ人が重複して表示される原因になる。
+  screenshots = [];
+  renderScreenshots();
+  clearTextInput();
+  const panel = document.getElementById('screenshot-panel');
+  const btn = document.getElementById('btn-sc');
+  if (panel) panel.classList.remove('open');
+  if (btn) btn.classList.remove('active');
+}
+
+function parseAndApply(scId) {
+  const sc = screenshots.find(s => s.id === scId);
+  if (!sc || !sc.ocrText) return;
+
+  const text = sc.ocrText;
+
+  // 簡易パース: メンバー名・希望日・時間帯を抽出して表示
+  const parsed = parseScheduleText(text);
+  if (parsed.length === 0) {
+    alert('スケジュールデータが見つかりませんでした。\nテキストを確認して手動で修正してください。');
+    return;
+  }
+
+  const daysMax = new Date(currentYear, currentMonth, 0).getDate();
+
+  openReviewModal(parsed,
+    `${currentYear}年${currentMonth}月・${daysMax}日まで／名前が一致する人は内容を更新し、一致しない人はそのまま残ります`);
+}
+
+// 複数枚のスクショに対応するため、貼り付けた全スクショの文字起こし結果を
+// まとめて1回で解析・反映する。1枚ずつ「解析してデータ更新」すると、その
+// つど「今回のスクショの内容だけ」でメンバー一覧が作り直され、先に反映した
+// 分が消えてしまう（＝複数スクショに対応できない）ため、必ずこちらを使う。
+function parseAndApplyAllScreenshots() {
+  const doneShots = screenshots.filter(s => s.ocrStatus === 'done' && s.ocrText);
+  const runningCount = screenshots.filter(s => s.ocrStatus === 'running').length;
+  if (doneShots.length === 0) {
+    if (runningCount > 0) {
+      alert(`文字起こしがまだ完了していません（残り${runningCount}件）。少し待ってからもう一度お試しください。`);
+    } else {
+      alert('文字起こし済みのスクショがありません。まずスクショを貼り付けてください。');
+    }
+    return;
+  }
+  if (runningCount > 0) {
+    if (!confirm(`まだ文字起こし中のスクショが${runningCount}件あります。完了分だけで先に反映しますか？`)) return;
+  }
+
+  const combinedText = doneShots.map(s => s.ocrText).join('\n');
+  const parsed = parseScheduleText(combinedText);
+  if (parsed.length === 0) {
+    alert('スケジュールデータが見つかりませんでした。\n各スクショのテキストを確認して手動で修正してください。');
+    return;
+  }
+
+  const daysMax = new Date(currentYear, currentMonth, 0).getDate();
+
+  openReviewModal(parsed,
+    `${currentYear}年${currentMonth}月・${daysMax}日まで／スクショ${doneShots.length}枚分をまとめて解析。名前が一致する人は内容を更新し、一致しない人はそのまま残ります`);
+}
+
+// テキストで直接入力された内容（LINEのメッセージをそのままコピペしたものなど）を、
+// スクショのOCR結果とまったく同じパース処理（parseScheduleText）にかけて反映する。
+// スクショの文字起こし（OCR）は精度が完璧ではなく、毎回スクショを撮って貼り付ける
+// のも手間がかかるため、確実な内容ならテキストのまま直接入力できるほうが速くて
+// 正確。OCR経路とは別の入力口を用意するだけで、パース以降のロジック（レビュー
+// モーダルでの確認・反映）はスクショ経路とまったく同じものを使う。
+function parseAndApplyTextInput() {
+  const ta = document.getElementById('text-input-area');
+  const text = (ta ? ta.value : '').trim();
+  if (!text) {
+    alert('テキストが入力されていません。名前と希望日を入力してください。');
+    return;
+  }
+
+  const parsed = parseScheduleText(text);
+  if (parsed.length === 0) {
+    alert('スケジュールデータが見つかりませんでした。\n入力内容を確認してください。');
+    return;
+  }
+
+  const daysMax = new Date(currentYear, currentMonth, 0).getDate();
+
+  openReviewModal(parsed,
+    `${currentYear}年${currentMonth}月・${daysMax}日まで／名前が一致する人は内容を更新し、一致しない人はそのまま残ります`);
+}
+
+function clearTextInput() {
+  const ta = document.getElementById('text-input-area');
+  if (ta) ta.value = '';
+}
+
+// 全角数字・全角記号を半角に正規化（OCR/LINEスクショはしばしば全角混じり）
+function normalizeScheduleText(str, preserveSpacing) {
+  // ChatGPT/Gemini等のAIに整形してもらったテキストや、他のメモアプリからの
+  // コピペには「* 作業できる日：午前 2, 30日」のような箇条書きの記号（*・-・
+  // ・等）が行頭に付くことが多い。この記号があると、行が本文キーワード
+  // （「作業」等）で「素直に」始まっていないと判定され、続き行として認識
+  // されずに「作業」という実在しない人物が新規メンバーとして誤登録されて
+  // しまう不具合があった。行頭の箇条書き記号（と直後の空白）は先に取り除く。
+  str = str.replace(/^[-*・•●▪◦‣][ 　]+/, '');
+  str = str
+    .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/[，、・．]/g, ',')
+    .replace(/[〜～]/g, '~')
+    .replace(/[／]/g, '/');
+  // (v3で修正) LINEのトーク画面から投稿をそのままコピーすると、「15:15 あけみさん
+  // 作業できる日...」のように、行の先頭に投稿時刻（「15:15」等）が付いてくることが
+  // ある。時刻の数字は名前の文字種（かな・漢字・英字）に一致しないため、これが
+  // あると名前の切り出しがそもそも始められず、本人がまるごと結果から消えてしまう
+  // 不具合があった。行頭の「時:分」（秒付きの場合も）とその直後の空白は、
+  // 本文の判定に入る前に取り除く。
+  str = str.replace(/^\d{1,2}:\d{2}(?::\d{2})?[ 　]+/, '');
+  // (v3で修正) 世話役が複数メンバーの回答をまとめて代理で投稿する場合、
+  // 「あけみ　西尾さん なんちゃん　　作業できる日　3.5」のように、実際に
+  // 予定を回答した本人の名前（なんちゃん）の前に、投稿したLINEアカウントの
+  // 名前（あけみ　西尾さん）が余計に付いてくることがある。この場合、本当の
+  // 本人の名前は「作業できる日」等の本文キーワードの直前にある。まだ空白の
+  // 情報が残っている（＝直前の文字詰め処理より前の）段階で、本文キーワードの
+  // 直前にある名前らしき文字列と、その前の空白を手がかりに、投稿アカウント名
+  // （空白の前にある部分）を切り捨てる。名前らしき文字列の直前に空白が無い
+  // 場合（＝普通の「名前　作業できる日」の形）は何もしない。
+  str = (function (line) {
+    const kwRe = /(作業|可能|希望|OK|ok|大丈夫|空いて|できる|できない|できません|以外|不可|NG|ng|無理|休み|お休み|参加|不参加|終日|午前|午後|朝|夕|夜|未定|検討中|かも|たぶん|いつでも|いつも|毎日|全部)/;
+    const m = kwRe.exec(line);
+    if (!m) return line;
+    let i = m.index;
+    while (i > 0 && / |　/.test(line[i - 1])) i--;
+    let j = i;
+    while (j > 0 && /[一-龯ぁ-んァ-ヶー豈-﫿A-Za-z]/.test(line[j - 1])) j--;
+    const nameRun = line.slice(j, i);
+    if (!nameRun) return line;
+    // 直前に空白があるだけでは切り捨てない。「西尾 あけみ さん」のような、
+    // 姓・名の間にスペースを挟んだ1人分の名前と、区別がつかないため
+    // （どちらも「単語＋空白＋単語」という見た目上は同じ形になる）。
+    // 「さん／くん／ちゃん／様／君」等の敬称で終わっている場合に限り、
+    // それは「本人ではない誰か（＝投稿アカウント）」を名指ししている
+    // 可能性が高いと判断し、その部分を切り捨てる。
+    if (j > 0 && / |　/.test(line[j - 1])) {
+      const prefix = line.slice(0, j - 1);
+      if (/(さん|くん|君|ちゃん|様)$/.test(prefix)) {
+        return nameRun + line.slice(i);
+      }
+    }
+    return line;
+  })(str);
+  // LINEスクショのOCRは、吹き出しのフォントの都合で文字と文字の間に余計な半角/全角
+  // スペースを1つずつ挿入してしまうことが多い（例:「西尾 あけみ さん」「作業 で きる 日」）。
+  // 日本語の文章は本来スペースで単語を区切らないため、1文字ずつの間に入った単発の
+  // スペースは全てOCRノイズとみなして詰める。
+  // ただし「名前」と「日付の数字」の間のスペース（例:「眞崎智絵 2/7、8」）は、
+  // 名前とそれ以降の本文を区切る唯一の手がかりになっていることが多い、意味のある
+  // 区切りである。以前は数字も同じ文字種としてまとめて詰めてしまっていたため、
+  // 「名前 数字」の間のスペースまで消えてしまい、名前の切り出しに失敗して
+  // その人がまるごと解析結果から消えてしまう不具合があった。そのため、詰めるのは
+  // 「文字どうし」または「数字どうし」の間のスペースだけに限定し、文字と数字の
+  // 境目のスペースは意味のある区切りとして残す。
+  // (v3で修正) この「文字どうし」の詰め対象に英字（A-Za-z）も含めていたため、
+  // 「AKEMI NISHIO」のように姓と名を半角スペースで区切ったローマ字の名前まで
+  // 「AKEMINISHIO」と1語に詰められてしまい、後段の名前切り出しがスペースという
+  // 唯一の境界を失って本人がまるごと結果から消えてしまう不具合があった。
+  // OCRの1文字ずつのノイズスペースは主にかな・漢字で起きる現象のため、
+  // 詰める対象はかな・漢字どうしの間のスペースに限定し、英字どうしの間の
+  // スペースは（姓名の区切り等、意味のある区切りである可能性が高いため）残す。
+  // (v3で修正) 行頭にタイムスタンプが付いていた行（＝LINEの投稿をそのまま
+  // コピーした行）は、OCRで読み取ったものではなく実際に入力された文字列
+  // そのものなので、単語間の空白はすべて意味のある区切りである。このような
+  // 行では、かな・漢字どうしの間の空白も含めて一切詰めず、「あけみ　西尾
+  // 難波」のように投稿者名・対象者名が複数語にまたがる場合でも、後段で
+  // 本文キーワード直前の語（＝対象者名）を正しく取り出せるようにする。
+  if (!preserveSpacing) {
+    str = str.replace(/([一-龯ぁ-んァ-ヶー豈-﫿])[ 　]+(?=[一-龯ぁ-んァ-ヶー豈-﫿])/g, '$1');
+  }
+  str = str.replace(/(\d)[ 　]+(?=\d)/g, '$1');
+  // 「出来る／出来ない／出来ません」のような漢字表記は「できる／できない／
+  // できません」のひらがな表記と全く同じ意味だが、以降のキーワード判定用の
+  // 正規表現がひらがな表記しか見ておらず、漢字表記だと可能日・NG日・全否定
+  // （今月は参加できません等）のどの判定にも引っかからず本人がまるごと
+  // 解析結果から消えてしまう不具合があった。「出来」を「でき」に正規化する
+  // ことで、後続の判定はすべて漢字表記でも同じように機能するようになる。
+  str = str.replace(/出来/g, 'でき');
+  return str;
+}
+
+// 「5/4」のような「今月/日」表記を日付番号だけに変換し、「5月」のような
+// 月そのものの言及（日を伴わない）は日付候補から除外する
+// （例:「5月の作業希望です」の「5」が日付と誤認されるのを防ぐ）
+function stripMonthNoise(str, month) {
+  str = str.replace(new RegExp(`(^|[^\\d.])${month}\\/(\\d{1,2})(?!\\d)`, 'g'), (m, pre, day) => pre + day);
+  str = str.replace(/\d{1,2}月(\d{1,2}日)/g, '$1');
+  str = str.replace(/\d{1,2}月(?!\d)/g, '');
+  return str;
+}
+
+// "1,3〜5,10" のような文字列から日付番号の配列を取り出す（範囲指定にも対応）
+function extractDayNumbers(str) {
+  const nums = new Set();
+  const rangeRe = /(\d+)\s*[~\-]\s*(\d+)/g;
+  let m, consumed = str;
+  while ((m = rangeRe.exec(str))) {
+    const a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+    if (a <= b) for (let d = a; d <= b; d++) nums.add(d);
+    consumed = consumed.replace(m[0], ' ');
+  }
+  (consumed.match(/\d+/g) || []).forEach(tok => {
+    const n = parseInt(tok, 10);
+    if (n >= 1 && n <= 31) { nums.add(n); return; }
+    // (v3で修正) 「1419」のように、区切り記号が抜けて2つの日付がくっついてしまったと
+    // 思われる4桁の数字は、前半2桁・後半2桁がどちらも有効な日付（1〜31）であれば、
+    // 2つの日付として分割する（例:「1419」→14日・19日）。以前はこのような数字は
+    // 単純に31を超える無効な値として無視され、両方の日付が失われていた。
+    if (tok.length === 4) {
+      const a = parseInt(tok.slice(0, 2), 10), b = parseInt(tok.slice(2, 4), 10);
+      if (a >= 1 && a <= 31 && b >= 1 && b <= 31) { nums.add(a); nums.add(b); }
+    }
+  });
+  return [...nums];
+}
+
+// キーワード（以外／可能／NG等）の直前・直後の文字列から日付番号を抜き出す。
+// 「4.5日と25.26日以外」のように複数の日付グループが「と」等でつながっていても、
+// 数字だけを拾うので問題なく処理できる。
+function daysNear(text, re, side, maxWindow) {
+  const m = re.exec(text);
+  if (!m) return null;
+  const winStart = side === 'before' ? Math.max(0, m.index - maxWindow) : m.index + m[0].length;
+  const winEnd = side === 'before' ? m.index : Math.min(text.length, m.index + m[0].length + maxWindow);
+  return extractDayNumbers(text.slice(winStart, winEnd));
+}
+
+// 実際のLINEスクショにありがちな雑音行（相槌・お礼・投票・案内・タイムスタンプ等）を除外する
+function isNoiseLine(line) {
+  if (/^\d{1,2}[:：]\d{2}$/.test(line)) return true; // タイムスタンプ「10:47」
+  if (/^\d{1,2}\/\d{1,2}\s*[（(]?[日月火水木金土][）)]?$/.test(line)) return true; // 日付区切り「3/25(水)」
+  // LINEの相対時刻表示「7時間前」「3分前」等。この中の数字が可能日の数字と
+  // 混同されて誤った日付として拾われてしまうため、必ず除外する
+  // （OCRは末尾に「|」「[」等の記号を誤って付け足すことがあるため、末尾の
+  // 記号・空白は無視して判定する）
+  if (/^\d{1,3}(秒|分|時間|日|週間|ヶ月|年)前[\s　|｜\[\]:：]*$/.test(line)) return true;
+  if (/投票|参加.{0,3}不参加|出欠の希望をお知らせください|作業予定表担当からご連絡|棟部会|定例の出席|依頼しましょう|連絡先がわからない|除草等を行います|参加ください/.test(line)) return true;
+  if (!/\d/.test(line) && /(承知しました|ご連絡ありがとうございました|ありがとうございます)/.test(line)) return true;
+  return false;
+}
+
+// isNoiseLineは「行全体がタイムスタンプそのもの」の場合しか除外できない。
+// しかしOCRは吹き出しの本文と、その下に小さく表示される「7時間前」等の
+// 相対時刻表示を、改行なしで1行にくっつけて読み取ってしまうことがある
+// （例:「いつでもOKです😊 6時間前」）。この場合、末尾の「6時間前」の数字が
+// 「OKの直後にある数字」として可能日の抽出ロジックに拾われてしまい、
+// 本来「いつでも（全日OK）」と読み取るべき発言が「6日だけOK」のように
+// 誤って狭く解釈されてしまう不具合があった。行のどこにあっても、本文と
+// くっついた相対時刻表示は取り除いてから日付抽出にかける。
+function stripInlineNoise(line) {
+  return line
+    .replace(/\d{1,3}(秒|分|時間|日|週間|ヶ月|年)前(?=[\s　|｜\[\]:：]|$)/g, ' ')
+    // リアクション（😊2 💬4 のような絵文字＋件数）がOCRで「(②)」「(2)」のような
+    // カッコ書きの数字として文字化けし、名前や本文の行にくっつくことがある。
+    // 実際の可能日の表記でカッコ書きの数字が使われることはまずないため、
+    // 見つけ次第まとめて取り除く（これが可能日として誤って拾われるのを防ぐ）
+    .replace(/[\(（]\s*[0-9０-９①-⑳]{1,3}\s*[\)）]/g, ' ')
+    .replace(/[\s　]{2,}/g, ' ')
+    .trim();
+}
+
+// メンバー名としては扱わない一般的な挨拶・相槌の単語（フォールバック新規メンバー検出の誤爆防止）
+const GREETING_BLACKLIST = new Set([
+  'こんにちは', 'おはよう', 'おはようございます', 'こんばんは', 'ありがとう', 'ありがとうございます',
+  'よろしく', 'よろしくお願いします', 'よろしくお願いいたします', 'お疲れ様です', 'お疲れ様',
+  '失礼します', '参加', '不参加', '投票', '了解', '承知', '了解しました', '承知しました', 'はじめまして', 'です', 'ですが'
+]);
+
+function hasNameSignal(rest) {
+  // 「できません」（丁寧形）は「できない」（辞書形）とは別の文字列のため、
+  // 元々ここに含まれておらず、「今月は参加できません」のような数字を伴わない
+  // 全否定の発言だけが新規ブロックとして認識されず、直前の人の発言に紛れ込んで
+  // しまう不具合があった（bodyStartRe・looksRelevantには元々含まれていたため、
+  // 判定の食い違いが原因だった）。他の判定と一致させるため追加する。
+  if (/(以外|可能|希望|OK|ok|NG|ng|夕のみ|朝のみ|終日可能|不可|休み|お休み|できる|できない|できません|参加)/.test(rest)) return true;
+  return /\d\s*[日、,.〜~\-]/.test(rest);
+}
+
+// 続き行として現在のブロックに取り込んでよいか（無関係な相槌・雑談を巻き込まないため、
+// 数字か希望関連キーワードを含む行だけを継続行として扱う）。
+// 「7 半 千 計」のような、タイムスタンプがOCRで完全に文字化けした雑音行は、
+// キーワードを含まず、しかも数字が「日」等の日付らしい文脈を伴わないため、
+// 単に数字が1つ入っているというだけでは継続行として取り込まないようにする
+// （そうしないと前の人の可能日にこの数字が混ざってしまう）。
+function looksRelevant(line) {
+  if (/(以外|可能|希望|OK|ok|NG|ng|夕のみ|朝のみ|終日可能|不可|休み|お休み|できません|できる|できない|お願い)/.test(line)) return true;
+  // 「作業できる日」「朝」「2.5.6」のように、時間帯（朝／夕／夜／午前／午後）だけを
+  // 独立した1行で書く人がいる（LINEでは改行するとメッセージが別の吹き出し・別行に
+  // なりやすいため）。この「朝」等が単独の行だと、以前はどのキーワードにも一致せず
+  // 継続行として取り込まれずに読み捨てられてしまい、「朝のみ」という時間帯の希望が
+  // 消えて「終日可能」（本人が言っていない範囲まで含む）に化けてしまっていた。
+  if (/^(朝|夕方?|夜|午前|午後)$/.test(line)) return true;
+  // (v3で修正) 「池田あやこ 池田　作業出来る日」の次の行に「未定」とだけ書いて
+  // 都合が未確定であることを伝える回答があった。以前は「未定」単独の行がどの
+  // キーワードにも一致せず継続行として取り込まれず読み捨てられてしまい、本文が
+  // 空のまま可能日ゼロ・ステータス「確定」と判定されて本人がまるごと結果から
+  // 消えてしまっていた。「未定」等の保留系の単語も、時間帯の単語と同様に単独行
+  // として認める。
+  if (/^(未定|検討中|かも|たぶん|わからな[いく]?|保留)$/.test(line)) return true;
+  return /\d\s*[日、,.〜~\-]/.test(line);
+}
+
+// 行が既知メンバーの発言かどうかを判定する。フルネーム一致だけでなく、
+// 「清田です」のような姓のみの名乗りや、「pooh 森畑」のようなLINEニックネーム
+// プレフィックス付きの表示名にも対応する。
+// "Keiko"→"eiko"や大文字/小文字の揺れ（OCRは"Keiko"を"KEIKO"や"keiko"のように
+// 読むことがある）に影響されないよう、比較の際はアルファベットだけ小文字に
+// そろえる（漢字・かなはそのまま）
+function foldLatin(s) {
+  return s.replace(/[A-Za-z]/g, c => c.toLowerCase());
+}
+
+function matchKnownMember(line) {
+  const lineF = foldLatin(line);
+  for (const mm of MEMBERS) {
+    const full = foldLatin(mm.name.replace(/\s/g, ''));
+    if (lineF.startsWith(full)) return mm;
+  }
+  for (const mm of MEMBERS) {
+    const full = foldLatin(mm.name.replace(/\s/g, ''));
+    if (full.length < 3) continue;
+    const surname = full.slice(0, 2);
+    if (lineF.startsWith(surname)) {
+      const rest = lineF.slice(surname.length);
+      if (rest === '' || /^(です|さん|、|,|:|：)/.test(rest)) return mm;
+    }
+  }
+  const stripped = lineF.replace(/^[a-z0-9_.]+[\s　]+/, '');
+  if (stripped !== lineF) {
+    for (const mm of MEMBERS) {
+      const full = foldLatin(mm.name.replace(/\s/g, ''));
+      if (stripped.startsWith(full)) return mm;
+    }
+  }
+  // OCRはアイコン部分や「」などの記号を氏名の前に誤って読み取ってしまうことが多いため、
+  // 行の先頭でなくても、先頭付近（20文字以内）に氏名が現れていれば同一人物とみなす
+  for (const mm of MEMBERS) {
+    const full = foldLatin(mm.name.replace(/\s/g, ''));
+    if (full.length < 2) continue;
+    const idx = lineF.indexOf(full);
+    if (idx >= 0 && idx <= 20) return mm;
+  }
+  // LINEのプロフィール表示欄はOCRの読み取り順の都合で姓と名が入れ替わって
+  // 認識されることがある（例:「西尾あけみ」→「あけみ西尾」）。姓・名をそれぞれ
+  // 2文字ずつに区切り、順序を問わず両方が行内に含まれていれば同一人物とみなす。
+  for (const mm of MEMBERS) {
+    const full = foldLatin(mm.name.replace(/\s/g, ''));
+    if (full.length < 4) continue;
+    const surname = full.slice(0, 2);
+    const given = full.slice(2);
+    if (lineF.includes(surname) && lineF.includes(given)) return mm;
+  }
+  // ここまでで見つからない場合、画像内のアイコンやフォントの都合でOCRが
+  // 氏名の文字を一部読み間違えていることがある（例:「瀬平劉キャサリン」→
+  // 「作Mがイ癌キャサリン」、「あけみ」→「代濁2けみ」）。誤読があっても
+  // 氏名を構成する文字のうち十分な割合がその行のどこかに残っていれば、
+  // 同一人物の発言とみなす。複数人と紛らわしくならないよう、一番一致率が
+  // 高い候補が二番目の候補よりも明確に高い場合だけ採用する。
+  let bestMatch = null, bestScore = 0, secondScore = 0;
+  for (const mm of MEMBERS) {
+    const full = foldLatin(mm.name.replace(/\s|　/g, ''));
+    if (full.length < 3) continue;
+    const chars = [...new Set(full.split(''))];
+    const hitCount = chars.filter(c => lineF.includes(c)).length;
+    const score = hitCount / chars.length;
+    if (score > bestScore) { secondScore = bestScore; bestScore = score; bestMatch = mm; }
+    else if (score > secondScore) { secondScore = score; }
+  }
+  if (bestMatch && bestScore >= 0.6 && (bestScore - secondScore) >= 0.15) return bestMatch;
+  return null;
+}
+
+// 「午前」「午後」で区切られたテキスト片（すでにマーカーで区切ってあるため、
+// 前後に無関係な数字が入り込む余地がない）から、その区間内の可能日／NG日を
+// 抽出する。以前は「可能」等のキーワードから固定20文字だけを見る実装だったため、
+// 午前・午後の可能日リストを1行に両方書くと後半（午後）が範囲外になって消えたり、
+// 「29」のような2桁の数字が範囲の切れ目でちぎれて「2」だけ拾われたりする不具合が
+// あった。マーカーで区切った区間全体から数字を拾うことで、この問題を避ける。
+function extractSegmentAvailability(seg, daysMax) {
+  if (!seg || !/\d/.test(seg)) return { available: [], unavailable: [] };
+
+  const alwaysOk = /(いつでも|いつも|毎日|全部|どの日でも|何日でも|何時でも)(も)?(OK|ok|大丈夫|可能|いい)/.test(seg);
+  const exceptMatch = /以外/.test(seg);
+  const ngRe = /(不可|NG|ng|無理|✕|×|できません|だめです|ダメです|できない)/;
+  const hasNg = ngRe.test(seg);
+
+  const nums = extractDayNumbers(seg).filter(d => d >= 1 && d <= daysMax);
+
+  if (alwaysOk && !exceptMatch && !hasNg) {
+    const all = [];
+    for (let d = 1; d <= daysMax; d++) all.push(d);
+    return { available: all, unavailable: [] };
+  }
+  if (exceptMatch || hasNg) {
+    // 数字はNG日として扱い、それ以外の日を可能日として組み立てる
+    const unavailable = nums;
+    const available = [];
+    for (let d = 1; d <= daysMax; d++) if (!unavailable.includes(d)) available.push(d);
+    return { available, unavailable };
+  }
+  return { available: nums, unavailable: [] };
+}
+
+// LINEスクショのOCRテキストからメンバーごとの希望データを抽出する。
+// 表示中の年月（currentYear/currentMonth）を基準に日付の上限をチェックするため、
+// 月によって日数が違っても（4月=30日、2月=28日等）誤った日付を拾わない。
+function parseScheduleText(text) {
+  const daysMax = new Date(currentYear, currentMonth, 0).getDate();
+  // (v3で修正) 「16:41 Keiko 岩元　作業できる日...」のように、LINEの投稿を
+  // そのままコピーした行は、行頭のタイムスタンプの直後にまず「投稿者名」
+  // （＝取り次いでいる別の人。本文の対象者とは限らない）が来る、という
+  // 決まった構造を持つ。この構造かどうかを後段の名前切り出しで判定できる
+  // よう、正規化で消える前の行頭タイムスタンプの有無を先に控えておく。
+  const rawLines = text.split('\n')
+    .map(l => {
+      const trimmed = l.trim();
+      const hadTimestamp = /^\d{1,2}:\d{2}(?::\d{2})?[ 　]+/.test(trimmed);
+      return { line: stripInlineNoise(normalizeScheduleText(trimmed, hadTimestamp)), hadTimestamp };
+    })
+    .filter(o => Boolean(o.line))
+    .filter(o => !isNoiseLine(o.line));
+
+  // 行をメンバーごとのブロックに分割する。
+  // 同じ人が会話の中で複数回発言している場合（複数スクショをまとめて解析した
+  // ときや、間に他の人の発言が挟まる場合を含む）でも、名前ごとに必ず1つの
+  // ブロックへまとめる。ここで名前ごとにまとめておかないと、後段の結果一覧
+  // （＝参加回数パネル）に同じ人が複数行、別々の集計人数で重複表示されてしまう。
+  const blocksByName = new Map();
+  let current = null;
+  rawLines.forEach(({ line, hadTimestamp }) => {
+    let name = null, isNewBlock = false, nameIsReliable = false;
+    // 名前の切り出しに使う「本文キーワード」の正規表現。行頭一致版（bodyStartRe）と
+    // 行のどこにあっても探せる版（bodyKeywordAnyRe）の両方をここで用意しておく
+    // （下の複数の判定ブロックで共通して使うため、まとめて先頭に定義する）。
+    const bodyStartRe = /^(作業|可能|希望|OK|ok|大丈夫|空いて|できる|できない|できません|以外|不可|NG|ng|無理|休み|お休み|参加|不参加|終日|午前|午後|朝|夕|夜|未定|検討中|かも|たぶん|いつでも|いつも|毎日|全部|です|さん)/;
+    const bodyKeywordAnyRe = new RegExp(bodyStartRe.source.slice(1));
+    // (v3で修正) 「16:38 あけみ　西尾　なんちゃん　作業できる日　3.5」のように、
+    // 行頭にタイムスタンプが付いている行（＝LINEの投稿をそのままコピーした行）で、
+    // 同じ行内に本文キーワードが見つかる場合は、キーワードの直前にある単語
+    // （＝スペースで区切られた最後のかたまり）を対象者の名前として最優先で
+    // 採用する。投稿者名が「あけみ　西尾」のように2語以上に渡っていても、
+    // 敬称（さん等）が付いていなくても、常にこのルールで対象者名だけを
+    // 正しく切り出せる。名簿との照合（matchKnownMember）より先に行うのは、
+    // 投稿者名の一部（例:「あけみ」）がたまたま別の登録済みメンバーの名前と
+    // 一致してしまい、誤って投稿者の方を対象者と認識してしまう事故を防ぐため。
+    if (hadTimestamp) {
+      const kwMatch = bodyKeywordAnyRe.exec(line);
+      if (kwMatch) {
+        let i = kwMatch.index;
+        while (i > 0 && /[ 　]/.test(line[i - 1])) i--;
+        let j = i;
+        while (j > 0 && /[一-龯ぁ-んァ-ヶー豈-﫿A-Za-z]/.test(line[j - 1])) j--;
+        const cand = line.slice(j, i);
+        if (cand && !GREETING_BLACKLIST.has(cand)) {
+          name = cand;
+          isNewBlock = true;
+          // (v3で修正) 「菅」のように姓が漢字1文字だけの人もいる。この
+          // タイムスタンプ優先ルートは、実際のLINE投稿かつ本文キーワードの
+          // 直前という確実な手がかりから切り出しているため、他の（あいまいな）
+          // 切り出し方法向けの「2文字未満は誤検出とみなして除外する」という
+          // 安全策の対象外とし、1文字の名前でも正しく残るようにする。
+          nameIsReliable = true;
+        }
+      }
+    }
+    const knownMatch = isNewBlock ? null : matchKnownMember(line);
+    if (isNewBlock) {
+      // 上のタイムスタンプ優先ルールで名前が決まっている場合は何もしない
+    } else if (knownMatch) {
+      name = knownMatch.name;
+      isNewBlock = true;
+    } else {
+      // 名簿（MEMBERS）に載っていない人・表記ゆれで一致しなかった人でも、行の
+      // 先頭にある人名らしき部分を新規メンバーとして正しく切り出せるようにする。
+      // OCRノイズ除去のスペース詰め処理で名前と本文の間の空白が消えることがあり、
+      // 単純に8文字までgreedyに取ると本文（「作業可能日」等）まで名前に
+      // 取り込んでしまい、境界判定（空白必須）に失敗してその行が「新規メンバー」
+      // として独立せず、直前の人の続き行として誤って吸収される
+      // （＝他人のデータが混ざる）不具合があった。空白が無くても「作業」「可能」
+      // 「以外」等、本文が始まったとわかるキーワードの直前を境界として認め、
+      // 2文字から8文字まで短い方から順に試すことで、本文を巻き込まない
+      // 最短の妥当な名前を選ぶ。
+      // (v3で修正) 「AKEMI NISHIO」のように姓と名の間に半角/全角スペースを挟んだ
+      // 英字2語の名前だけの行があると、以前は下の候補切り出しループがスペースまでの
+      // 最初の1語（「AKEMI」）だけを候補にし、残りの姓（「NISHIO」）が本文キーワードにも
+      // 数字にも一致しないため「名前だけの行」とも判定できず、1語すら名前として
+      // 認められないまま本人がまるごと結果から消えてしまっていた。行全体が
+      // （1語または空白区切りの複数語の）名前用の文字種だけで構成されている場合は、
+      // 内部のスペースの有無にかかわらず、行全体をそのまま名前として認める。
+      const wholeLineNameRe = /^[一-龯ぁ-んァ-ヶー豈-﫿A-Za-z]+(?:[ 　][一-龯ぁ-んァ-ヶー豈-﫿A-Za-z]+)+$/;
+      if (wholeLineNameRe.test(line) && line.length <= 20 && !GREETING_BLACKLIST.has(line)) {
+        name = line;
+        isNewBlock = true;
+      } else
+      // 行そのものが最初からこの手の「本文キーワード」で始まっている場合
+      // （＝名前が付いていない、本文だけの継続行である場合）は、そもそも
+      // 名前の切り出しを試みない。試みてしまうと「作業できる日午前1,2,3日」の
+      // ような行で「作業」を人名の切れ目とみなし、存在しない「作業」という
+      // 人物を新規メンバーとして誤登録してしまう（本文キーワードが2つ以上
+      // 連続することも多く、境界チェックだけでは見分けられないため、まず
+      // 行頭一致を確認して継続行を弾く）。
+      if (!bodyStartRe.test(line)) {
+        // OCRは相槌やリアクション表示の一部を氏名の直前に「ご、」のような1〜数文字の
+        // ノイズとしてくっつけてしまうことがある。以前は候補の切り出しが必ず行の
+        // 先頭（位置0）から始まる決め打ちだったため、このノイズのせいで最初の
+        // 候補チェックから文字種違反になり、実際の名前（例:「なんちゃん」）が行の
+        // 途中にあっても一切試されずに終わっていた。行が最初から素直に2文字以上の
+        // かな・漢字で始まっている通常のケースでは今まで通り先頭だけを見るが、
+        // そうでない場合だけ、先頭付近（4文字以内）の数箇所を開始位置として試す
+        // （本文行の途中の漢字を誤って新規メンバー名と誤認する事故を避けるため、
+        // 通常ケースでは広げない）。
+        // (v3) 「Keiko」「tachikoma」のようにローマ字（英字）だけの名前は、以前は
+        // 名簿（MEMBERS）に事前登録されている場合の完全一致でしか検出できず、
+        // 名簿を空にする運用に変えたところ、ローマ字の名前の行がどのメンバーの
+        // ブロックにも属さず直前の人の続き行として誤って吸収されてしまう不具合が
+        // あった。文字種の判定に英字（A-Za-z）も対象文字種に加えることで、
+        // 事前登録なしでもローマ字の名前を新規メンバーとして正しく切り出せるようにした。
+        const startsWithClean2 = /^[一-龯ぁ-んァ-ヶー豈-﫿A-Za-z]{2}/.test(line);
+        const maxStart = startsWithClean2 ? 0 : Math.min(4, line.length - 2);
+        outer:
+        for (let start = 0; start <= maxStart; start++) {
+          for (let len = 2; len <= 8 && start + len <= line.length; len++) {
+            const cand = line.slice(start, start + len);
+            if (!/^[一-龯ぁ-んァ-ヶー豈-﫿A-Za-z]+$/.test(cand)) break; // 対象の文字種から外れたらそこで打ち切り
+            if (GREETING_BLACKLIST.has(cand)) continue;
+            const rest = line.slice(start + len);
+            // LINEは名乗りと本文が別々の吹き出し（＝別の行）に分かれることが多く、
+            // 「なんちゃん。」のように名前だけで1行が終わっていることがある。この場合、
+            // 本文（できる日・数字等）は次の行以降に来るため、この行自体には本文の
+            // 手がかりが何もない。以前はこの「名前だけの行」を新規メンバーの名乗りと
+            // 認められず（hasNameSignalが同じ行の中身しか見ていなかったため）、次の
+            // 行の可能日データが誰のものか分からず読み捨てられる・別人の続きに
+            // 誤って吸収される、という不具合があった。名簿と照合できるかどうかに関係なく、
+            // 「名前の残りが空白・句読点だけ（＝本文が何もない）」なら、その時点で
+            // 素直に新規メンバーの名乗りとして認める（本文は次の行以降のlooksRelevant判定に任せる）。
+            const isNameOnlyLine = /^[\s　,、。.:：]*$/.test(rest);
+            const hasBoundary = isNameOnlyLine || /^[\s　,、:：]/.test(rest) || bodyStartRe.test(rest);
+            if (hasBoundary && (isNameOnlyLine || hasNameSignal(rest))) {
+              // (v3で修正) 「AKEMI NISHIO 作業できる日...」のように姓名をスペースで
+              // 区切った英字の名前が本文と同じ行に続く場合、姓（2語目）を含めずに
+              // 名（1語目）だけで境界条件を満たしてしまい、姓が本文側に取り残されて
+              // しまう不具合があった。名前候補の直後が「スペース＋もう1語」であり、
+              // その1語まで含めてもなお本文側が妥当な境界を保てるなら、2語目まで
+              // 含めて名前とする。
+              let finalCand = cand, finalRest = rest;
+              const extMatch = finalRest.match(/^([ 　])([一-龯ぁ-んァ-ヶー豈-﫿A-Za-z]+)/);
+              if (extMatch) {
+                const extSp = extMatch[1];
+                let extWord = extMatch[2];
+                // (v3で修正) 「Keiko 岩元　作業できる日...」のように、LINEの投稿者名
+                // （関係のない人の名前）が本当の名前の前に付いているケースでは、
+                // 空白つぶし正規化で「岩元」と「作業できる日」の間の空白が消え、
+                // 2語目が「岩元作業できる日午前」のように本文キーワードごと1つの
+                // 単語に見えてしまう。2語目の中に本文キーワードが紛れていたら、
+                // そこで単語を打ち切り、本文側を巻き込まないようにする。
+                const kwInWord = extWord.match(bodyKeywordAnyRe);
+                if (kwInWord) extWord = extWord.slice(0, kwInWord.index);
+                if (extWord) {
+                  const extRest = finalRest.slice(extSp.length + extWord.length);
+                  const extIsNameOnly = /^[\s　,、。.:：]*$/.test(extRest);
+                  const extHasBoundary = extIsNameOnly || /^[\s　,、:：]/.test(extRest) || bodyStartRe.test(extRest);
+                  if (extHasBoundary && (extIsNameOnly || hasNameSignal(extRest))) {
+                    // (v3で修正) 「16:41 Keiko 岩元　作業できる日...」のように行頭に
+                    // タイムスタンプが付いていた行は、LINEの投稿として1語目
+                    // （ここでは「Keiko」）が投稿者名、2語目（「岩元」）以降が
+                    // 本文という決まった構造を持つ。この場合は1語目を本人の名前に
+                    // 含めず、本文キーワード直前の2語目だけを名前として採用する
+                    // （1語目と連結すると「Keiko 岩元」のように無関係な投稿者名が
+                    // 混ざってしまうため）。タイムスタンプが無い行（例:
+                    // 「AKEMI NISHIO 作業できる日...」）は、姓名をスペースで
+                    // 区切った1人の名前である可能性が高いため、従来通り1語目・
+                    // 2語目をまとめて名前とする。
+                    if (hadTimestamp) {
+                      finalCand = extWord;
+                    } else {
+                      finalCand += extSp + extWord;
+                    }
+                  }
+                }
+              }
+              name = finalCand; isNewBlock = true; break outer;
+            }
+          }
+        }
+      }
+    }
+    if (isNewBlock) {
+      if (blocksByName.has(name)) {
+        current = blocksByName.get(name);
+        current.lines.push(line);
+        current.reliable = current.reliable || nameIsReliable;
+      } else {
+        current = { name, lines: [line], reliable: nameIsReliable };
+        blocksByName.set(name, current);
+      }
+    } else if (current && looksRelevant(line)) {
+      current.lines.push(line);
+    }
+  });
+  const blocks = [...blocksByName.values()];
+
+  const results = [];
+  blocks.forEach(block => {
+    let text = block.lines.join(' ');
+    text = stripMonthNoise(text, currentMonth);
+
+    let timePref = '終日可能';
+    if (/夕|夜|午後/.test(text)) timePref = '夕のみ';
+    else if (/朝|午前/.test(text)) timePref = '朝のみ';
+    if (/(朝|午前).*(夕|夜|午後)|(夕|夜|午後).*(朝|午前)/.test(text)) timePref = '終日可能';
+
+    let available = [], unavailable = [];
+
+    // 「4.5日と25.26日以外OK」のように「〜以外」で可能日を表す形式
+    // (v3で変更) 日付の窓（前後何文字まで数字を拾うか）が短すぎると、月の後半まで
+    // びっしり日付が並ぶ長いリスト（「1,3,4,6,7,10,11,...,31日」等）の後半が
+    // 窓の外に切れて拾われなくなる不具合があった。1件あたり平均3〜4文字として
+    // 月最大31件が収まるよう、日付を数える窓は十分広く取る。
+    const exceptDays = daysNear(text, /以外/, 'before', 150);
+    if (exceptDays) unavailable = exceptDays.filter(d => d >= 1 && d <= daysMax);
+
+    // NG日を明示するパターン（前置「10日は不可／できません／できない」／
+    // 後置「NG:10,20」「できない日1,25,29」のどちらの語順にも対応する）
+    const ngRe = /(不可|NG|ng|無理|✕|×|できません|だめです|ダメです|できない)/;
+    const ngBeforeDays = daysNear(text, ngRe, 'before', 150);
+    const ngAfterDays = daysNear(text, ngRe, 'after', 150);
+    let hadExplicitNg = false;
+    if (ngBeforeDays && ngBeforeDays.length) { hadExplicitNg = true; unavailable = [...new Set([...unavailable, ...ngBeforeDays.filter(d => d >= 1 && d <= daysMax)])]; }
+    if (ngAfterDays && ngAfterDays.length) { hadExplicitNg = true; unavailable = [...new Set([...unavailable, ...ngAfterDays.filter(d => d >= 1 && d <= daysMax)])]; }
+
+    // 「いつでもOKです」「毎日大丈夫」のように、具体的な日付を挙げずに「全部OK」と
+    // いう意味の発言は、日付を挙げていない分、最も明確でブレのないシグナルである。
+    // OCRノイズ（リアクション数・タイムスタンプ・絵文字などが生んだ余計な数字が
+    // 「OK」の近くに来てしまうこと）があると、下の「OKキーワード付近の数字を拾う」
+    // 処理がその余計な数字だけを可能日と誤認識し、「いつでもOK」が「◯日だけOK」に
+    // 化けてしまう不具合があった。そのため「いつでも」表現を検出した場合は、
+    // 数字ベースの可能日抽出そのものをスキップし、必ず全日OKを優先する。
+    const alwaysOk = /(いつでも|いつも|毎日|全部|どの日でも|何日でも|何時でも)(も)?(OK|ok|大丈夫|可能|いい)/.test(text);
+
+    let okDays = null;
+    if (!alwaysOk) {
+      // 可能日を明示するパターン（「可能／希望／OK／大丈夫／空いて／できる／可」）。
+      // 「1,2,3日は可能です」のように日付が先に来る場合と、「できる日は1,2,3」のように
+      // キーワードが先に来る場合の両方の語順に対応する。
+      const okRe = /(可能|希望|OK|ok|大丈夫|空いて|できる|[^不]可(?!能))/;
+      const okBeforeDays = daysNear(text, okRe, 'before', 150);
+      const okAfterDays = daysNear(text, okRe, 'after', 150);
+      if (okBeforeDays && okBeforeDays.length) okDays = okBeforeDays;
+      else if (okAfterDays && okAfterDays.length) okDays = okAfterDays;
+      if (okDays && okDays.length && !exceptDays) {
+        available = okDays.filter(d => d >= 1 && d <= daysMax);
+      }
+    }
+
+    // 「4日か5日のいずれか1日」のような、候補日のうち1日だけ希望する特殊な表現
+    if (!alwaysOk && !available.length && !unavailable.length) {
+      const eitherMatch = text.match(/(いずれか|どちらか)/);
+      if (eitherMatch) {
+        const nearDays = extractDayNumbers(text.slice(Math.max(0, eitherMatch.index - 30), eitherMatch.index));
+        if (nearDays.length) available = nearDays.filter(d => d >= 1 && d <= daysMax);
+      }
+    }
+
+    // 「為国武夫　1,3,4」のように、「できる／可能／希望」等のキーワードを
+    // 一切書かず、名前の直後に日付の数字だけを書く人がいる。この場合、上の
+    // キーワードベースの抽出はすべて空振りし、可能日もNG日も見つからないまま
+    // 本人がまるごと結果から消えてしまっていた（＝せっかく書いてもらった数字が
+    // 完全に無視される）。名前を取り除いた残りのテキストが数字と区切り記号
+    // だけで構成されている（＝他に読み取るべき文言が何もない）場合は、キーワード
+    // 省略時のデフォルトとして、その数字をそのまま「できる日」とみなす。
+    if (!alwaysOk && !exceptDays && !hadExplicitNg && !okDays && !available.length && !unavailable.length) {
+      const nameFreeText = text.split(block.name).join(' ');
+      // 「森畑さん：1,2,11,15」のように、名前の直後に敬称（さん／様／君／ちゃん）と
+      // コロンが付くのが実際にはごく普通の書き方だが、この2つは日付・区切り記号の
+      // 文字種（数字・カンマ・全角句読点等）に含まれておらず、そのままでは
+      // 「数字だけで構成されている」という純度チェックに落ちて、キーワード無しで
+      // 数字だけ書いた人がまるごと結果から消えてしまっていた。判定用にだけ敬称と
+      // コロンを取り除き、実際の数字抽出は元のテキストに対して行う。
+      // 「夕方」「午前」等の時間帯だけの単語（希望／OK等のキーワードを伴わない）が
+      // 残っていると、数字だけで構成されているかの純度チェックに落ちて、キーワード
+      // 省略時のデフォルト読み取りが働かず本人がまるごと消えてしまうため、時間帯の
+      // 単語も敬称と同様に判定用テキストから取り除く（実際の数字抽出は元のテキストのまま）
+      const checkText = nameFreeText.replace(/さん|様|君|ちゃん|午前|午後|夕方|朝|夕|夜/g, ' ');
+      if (/\d/.test(checkText) && /^[\s,.:：\d〜~・、\-]+$/.test(checkText.trim())) {
+        available = extractDayNumbers(nameFreeText).filter(d => d >= 1 && d <= daysMax);
+      }
+    }
+
+    // 「いつでもOK」と判定され、かつ「〜以外」等で個別に除外された日もない場合は
+    // 当月の全日を可能日として扱う（具体的な可能日・NG日の数字抽出は上で
+    // スキップしているため、ここが唯一の「いつでもOK」の反映ポイントになる）。
+    if (alwaysOk && !available.length && !exceptDays) {
+      for (let d = 1; d <= daysMax; d++) available.push(d);
+    }
+
+    let status = '確定';
+    if (/かも|たぶん|できれば|未定|わからな|検討中|保留/.test(text)) status = '保留';
+    // 「参加できません」のような固定フレーズだけでなく、「子供の夏季休暇中で、
+    // 作業できません」のように前の語が「参加」以外（作業／今月は等）でも、
+    // 具体的な日付が1つも書かれていない全否定の発言は「今月は完全に不参加」
+    // とみなす。日付が書かれている場合は既存のNG日抽出ロジックに任せるため、
+    // ここでは文中に数字が一切ない場合に限定する（数字があるのに全否定扱い
+    // すると、部分的なNG日の情報を握りつぶしてしまうため）。
+    // (v3で修正) 「作業できる日　なし」のように、「できる日」に続けて「なし」とだけ
+    // 書いて全否定を伝える表現に対応。以前はこのパターンだけ可能日・NG日・全否定の
+    // どの判定にも引っかからず、可能日ゼロ・ステータス「確定」のまま結果件数ゼロと
+    // 判定されて本人がまるごと結果から消えてしまっていた（数字が1つもないので
+    // 「数字だけの純度チェック」による最終手段の読み取りも効かなかった）。
+    const fullDecline = /休み|不参加|お休み|今月.*(無理|不可)|参加できません/.test(text)
+      || (!/\d/.test(text) && /(できません|できない|無理です|不可|難しいです|厳しいです)/.test(text))
+      || (!/\d/.test(text) && /(できる日|参加できる日|作業できる日|希望日|参加希望日)[:：]?なし/.test(text));
+    if (fullDecline) {
+      status = '解析不能';
+      available = [];
+      unavailable = [];
+    }
+
+    // 「〜以外」または（可能日リストなしの）NG日のみ指定の場合は、残りの日を可能日として組み立てる。
+    // ただし「いつでもOK」で全日を確定させたケース（alwaysOk）では、単にOK日の数字が
+    // 明示されていない（okDaysがnull）というだけでこの分岐に入ってしまうと、せっかく
+    // 「全日OK」で埋めた可能日が「NG日以外の全日」に上書きされてしまう
+    // （＝本人が言っていないはずのNG日が結果に影響してしまう）ため、alwaysOkの場合は
+    // ここでの組み立て直しは行わない。
+    if ((exceptDays || (hadExplicitNg && !alwaysOk && (!okDays || !okDays.length))) && status !== '解析不能') {
+      const rebuilt = [];
+      for (let d = 1; d <= daysMax; d++) if (!unavailable.includes(d)) rebuilt.push(d);
+      available = rebuilt;
+    }
+
+    // 可能日とNG日の両方に同じ日が入ってしまうことがある（別の人の発言が
+    // 誤って同じブロックに混ざった場合など）。矛盾したままだと「配置したのに
+    // NG日」という警告が出てしまうため、本人が明示的にOKと言った可能日を
+    // 優先し、NG日からは取り除く。
+    if (unavailable.length && available.length) {
+      unavailable = unavailable.filter(d => !available.includes(d));
+    }
+
+    available.sort((a, b) => a - b);
+    unavailable.sort((a, b) => a - b);
+
+    // 午前／午後を別々に指定する二部制フォーマット（「午前 1,4,5日 午後 22,24日」等）に
+    // 対応する。「午前」「午後」という語をマーカーとしてテキストを区切り、各区間の
+    // 数字だけをその区間の可能日／NG日として扱う（区間はマーカー同士の間なので、
+    // 固定文字数の窓を使うより正確に午前・午後を分離できる）。
+    const markerRe = /午前|午後/g;
+    const markers = [];
+    let mm;
+    while ((mm = markerRe.exec(text))) {
+      markers.push({ type: mm[0] === '午前' ? 'am' : 'pm', start: mm.index, end: mm.index + mm[0].length });
+    }
+    let amSeg = '', pmSeg = '', hasAm = false, hasPm = false;
+    markers.forEach((mk, idx) => {
+      const segEnd = idx + 1 < markers.length ? markers[idx + 1].start : text.length;
+      const seg = text.slice(mk.end, segEnd);
+      if (mk.type === 'am') { amSeg += ' ' + seg; hasAm = true; }
+      else { pmSeg += ' ' + seg; hasPm = true; }
+    });
+
+    let availableAm, availablePm, unavailableAm, unavailablePm;
+    if (status === '解析不能') {
+      availableAm = []; availablePm = []; unavailableAm = []; unavailablePm = [];
+    } else if (hasAm || hasPm) {
+      const amRes = extractSegmentAvailability(amSeg, daysMax);
+      const pmRes = extractSegmentAvailability(pmSeg, daysMax);
+      availableAm = amRes.available; unavailableAm = amRes.unavailable;
+      availablePm = pmRes.available; unavailablePm = pmRes.unavailable;
+    } else if (timePref === '朝のみ') {
+      availableAm = available.slice(); availablePm = [];
+      unavailableAm = unavailable.slice(); unavailablePm = unavailable.slice();
+    } else if (timePref === '夕のみ') {
+      availableAm = []; availablePm = available.slice();
+      unavailableAm = unavailable.slice(); unavailablePm = unavailable.slice();
+    } else {
+      // 時間帯の指定なし（終日可能）は、従来通り同じ可能日を午前・午後の両方に適用する
+      availableAm = available.slice(); availablePm = available.slice();
+      unavailableAm = unavailable.slice(); unavailablePm = unavailable.slice();
+    }
+
+    // available/unavailable（午前・午後の合算）は、レガシー表示や
+    // 「希望日が1つもあるか」等の判定用に、午前・午後の和集合として残しておく
+    const unionAvailable = [...new Set([...availableAm, ...availablePm])].sort((a, b) => a - b);
+    const unionUnavailable = [...new Set([...unavailableAm, ...unavailablePm])].sort((a, b) => a - b);
+
+    // (v3で修正) 「菅」のように姓が漢字1文字だけの人が、OCRノイズ対策の
+    // 「2文字未満は誤検出とみなして除外する」フィルターに引っかかって結果から
+    // 消えてしまう不具合があった。タイムスタンプ付きのLINE投稿から本文キーワード
+    // 直前の単語として確実に切り出された名前（block.reliable）は、この文字数
+    // フィルターの対象外とする。
+    if ((block.name.length >= 2 || block.reliable) && (unionAvailable.length || unionUnavailable.length || status !== '確定')) {
+      // aiCommentは「〜以外OK」のような読み取りにくい表現ではなく、
+      // 実際にOKな日付を直接書き出す（画面で見てすぐ検証できるようにするため）
+      let comment;
+      if (status === '解析不能' || (status === '保留' && unionAvailable.length === 0)) {
+        comment = `未確認: ${block.lines.join(' ').slice(0, 60)}`;
+      } else if (unionAvailable.length === 0) {
+        comment = `OK日データなし（元テキスト: ${block.lines.join(' ').slice(0, 40)}）`;
+      } else if (hasAm || hasPm) {
+        comment = `午前OK: ${availableAm.join(',') || 'なし'}日／午後OK: ${availablePm.join(',') || 'なし'}日`;
+      } else {
+        comment = `OK日: ${unionAvailable.join(',')}日`;
+      }
+      results.push({
+        name: block.name,
+        timePref,
+        available: unionAvailable,
+        unavailable: unionUnavailable,
+        availableAm,
+        availablePm,
+        unavailableAm,
+        unavailablePm,
+        status,
+        aiComment: comment
+      });
+    }
+  });
+
+  return results;
+}
+
+// (v3で変更) 以前はここで毎回メンバー一覧を「今回の入力内容だけ」で丸ごと
+// 作り直しており、前回までに一時保存・読み込みや別のタイミングで登録した
+// メンバーが、今回の入力に含まれていないというだけで一覧から消えてしまって
+// いた（＝複数回に分けて希望日を集める運用ができなかった）。現在は「名前が
+// 一致する人は今回の内容で更新し、一致しない人はそのまま残し、初めて出てくる
+// 名前は新規追加する」というマージ方式に変更した。既存メンバーはidを維持
+// したまま内容を上書きするため、その人がすでにカレンダーに配置されていた
+// 場合、配置（schedule/locked）もそのまま保持される。
+function applyParsedMembers(parsed) {
+  const norm = s => s.replace(/\s|　/g, '');
+  let nextId = MEMBERS.reduce((max, m) => Math.max(max, m.id), 0);
+
+  parsed.forEach(p => {
+    const pname = norm(p.name);
+    const existing = MEMBERS.find(m => norm(m.name) === pname);
+    if (existing) {
+      // 既存メンバー：id・roleは維持したまま、希望日等の内容だけ今回の解析結果で上書きする
+      existing.status = p.status;
+      existing.availableAm = p.availableAm || [];
+      existing.availablePm = p.availablePm || [];
+      existing.unavailableAm = p.unavailableAm || [];
+      existing.unavailablePm = p.unavailablePm || [];
+      existing.aiComment = p.aiComment;
+      // 本物の希望日回答で上書きされたので、手動追加フラグが立っていれば外す
+      existing.isManualAdd = false;
+    } else {
+      nextId += 1;
+      MEMBERS.push({
+        id: nextId,
+        name: p.name,
+        role: '一般',
+        status: p.status,
+        availableAm: p.availableAm || [],
+        availablePm: p.availablePm || [],
+        unavailableAm: p.unavailableAm || [],
+        unavailablePm: p.unavailablePm || [],
+        aiComment: p.aiComment
+      });
+    }
+  });
+
+  render();
+  // 注: ここでは alert() を出さない。反映結果はレビューモーダル側ですでに
+  // 確認済みであり、alert()はブロッキング表示のためレビューモーダルの裏に
+  // 重なって表示され、2つのダイアログが見た目に重なる不具合があったため廃止した。
+  // カレンダーの配置が未配置に戻る旨は呼び出し元（レビューモーダルを閉じた後）で
+  // 必要なら案内する。
+}
+
+// Paste (Ctrl+V) - グローバル
+document.addEventListener('paste', e => {
+  if (e.target.id === 'paste-area') return;
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        openAndAddScreenshot(item.getAsFile());
+        e.preventDefault();
+        return;
+      }
+    }
+    return;
+  }
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  let added = false;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      openAndAddScreenshot(item.getAsFile());
+      added = true;
+    }
+  }
+  if (added) e.preventDefault();
+});
+
+function openAndAddScreenshot(file) {
+  const panel = document.getElementById('screenshot-panel');
+  if (!panel.classList.contains('open')) {
+    panel.classList.add('open');
+    document.getElementById('btn-sc').classList.add('active');
+  }
+  addScreenshot(file);
+}
+
+function scDragOver(e) { e.preventDefault(); document.getElementById('paste-area').classList.add('drag-over-zone'); }
+function scDragLeave(e) { document.getElementById('paste-area').classList.remove('drag-over-zone'); }
+function scDrop(e) {
+  e.preventDefault();
+  document.getElementById('paste-area').classList.remove('drag-over-zone');
+  for (const f of e.dataTransfer.files) addScreenshot(f);
+}
+function scFileInput(e) { for (const f of e.target.files) addScreenshot(f); e.target.value = ''; }
+
+function openLightbox(url) { document.getElementById('lightbox-img').src = url; document.getElementById('lightbox').classList.add('open'); }
+function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+// ========================
+// 印刷サイズの自動調整（必ずA4縦1枚に収める）
+// ========================
+// 「印刷/PDF」ボタン・Ctrl+Pのどちらで印刷しても、実際に印刷される直前
+// （beforeprintイベント）に、この関数が現在の内容量（作業日数・セッション制・
+// 配置人数などによって毎回変わる）を実際に測定し、A4縦1枚の使える高さに
+// ちょうど収まるよう --print-scale を自動計算する。内容が少ない月は最大サイズ
+// （scale=1）のまま大きく表示され、内容が多い月だけ自動的に少し縮小される。
+// 測定は「.print-measure」というクラスを一時的にbodyへ付け、印刷用と同じ
+// フォントサイズ・余白のルール（ただし@media printの外に複製したもの）を
+// 通常表示のまま適用して高さを取得する方式（getBoundingClientRectは
+// @media print配下では測れないため）。
+//
+// (重要な修正) 以前は幅を画面のウィンドウ幅のまま測定していたため、画面が
+// 広いパソコンで印刷すると、実際のA4用紙（狭い幅）よりも1マスの横幅を広く
+// 見積もってしまい、名前の折り返しが少なく＝実際より低い高さで計算されていた。
+// その結果、印刷時（用紙の狭い幅で名前がより多く折り返される）には測定より
+// 高さが増えてしまい、縮小が足りず連絡事項が2ページ目にはみ出す不具合が
+// あった。測定の間だけbodyの幅を実際の印刷ページの幅（A4横210mm−左右余白）
+// に固定することで、名前の折り返され方を印刷時と一致させ、高さの見積もりを
+// 正確にする。
+// bodyの幅をA4印刷ページの実際の幅に固定し、.print-measureを適用したうえで
+// 高さを測ってA4縦1枚に収まる--print-scaleを計算する。呼び出し側が幅・
+// スケールを元に戻すためのrestore関数を返す（すぐ戻すか、html2canvasでの
+// 撮影後まで戻さないかは呼び出し側が選べるようにするため、ここでは戻さない）。
+function applyPrintLayoutForCapture() {
+  const root = document.documentElement;
+  root.style.setProperty('--print-scale', '1');
+
+  const MM_TO_PX = 96 / 25.4;
+  const usablePageWidthPx = (210 - 5 * 2) * MM_TO_PX; // A4横幅210mm − 左右余白5mm×2
+
+  const prevWidth = document.body.style.width;
+  const prevMaxWidth = document.body.style.maxWidth;
+  const prevMargin = document.body.style.margin;
+  const prevOverflow = document.body.style.overflow;
+  document.body.style.width = usablePageWidthPx + 'px';
+  document.body.style.maxWidth = usablePageWidthPx + 'px';
+  document.body.style.margin = '0 auto';
+  document.body.style.overflow = 'hidden';
+
+  document.body.classList.add('print-measure');
+  // 反映を確定させるための強制リフロー
+  void document.body.offsetHeight;
+
+  // 注: ここでは幅・print-measureクラスだけを元に戻す。--print-scaleの値は
+  // 戻さない（実際の印刷ではブラウザの印刷処理が終わるまでこの値を使い続ける
+  // 必要があり、画像撮影ではhtml2canvasでの撮影が終わるまで使い続ける必要が
+  // あるため）。--print-scaleを画面表示用の'1'に戻すのは呼び出し側の責任とする。
+  const restore = () => {
+    document.body.classList.remove('print-measure');
+    document.body.style.width = prevWidth;
+    document.body.style.maxWidth = prevMaxWidth;
+    document.body.style.margin = prevMargin;
+    document.body.style.overflow = prevOverflow;
+  };
+  // 呼び出し側（html2canvasでの撮影等）が、固定した幅の実際の値を
+  // 参照できるようにしておく
+  restore.capturedWidthPx = usablePageWidthPx;
+
+  const header = document.querySelector('.header');
+  const layout = document.querySelector('.layout');
+  const notices = document.querySelector('.notices-section');
+
+  if (!header || !layout || typeof header.getBoundingClientRect !== 'function') {
+    return restore;
+  }
+
+  const totalHeight = header.getBoundingClientRect().height
+    + layout.getBoundingClientRect().height
+    + (notices ? notices.getBoundingClientRect().height : 0);
+
+  // 測定できた場合のみ、A4縦1枚に収まるようスケールを計算して適用する
+  // （測定できなかった場合は縮小せずscale=1のままにする）
+  if (totalHeight && totalHeight > 0) {
+    // A4縦・余白5mm×2で実際に使える高さ（96dpi基準のCSS px換算）
+    const usableHeightPx = (297 - 5 * 2) * MM_TO_PX;
+    const SAFETY_MARGIN = 0.92; // 測定誤差やブラウザ差を見込んだ余裕
+    const MIN_SCALE = 0.5; // これ以上小さくすると読みにくくなるため下限を設ける
+    let scale = Math.min(1, (usableHeightPx / totalHeight) * SAFETY_MARGIN);
+    scale = Math.max(MIN_SCALE, scale);
+    root.style.setProperty('--print-scale', String(scale));
+    // スケール変更を反映させるための強制リフロー
+    void document.body.offsetHeight;
+  }
+
+  return restore;
+}
+
+// 実際の印刷（Ctrl+P／PDF保存）は、ブラウザの印刷エンジンが@page CSSに従って
+// 自動的にA4幅でレイアウトし直すため、印刷そのものにはbodyの幅固定は不要。
+// ここでは--print-scaleの値を求めるための「測定」だけを行い、測定が終わったら
+// 幅・スケールともすぐ元に戻す（画面表示に影響を与えないため）。
+function computePrintScale() {
+  const restore = applyPrintLayoutForCapture();
+  restore();
+}
+
+window.addEventListener('beforeprint', computePrintScale);
+window.addEventListener('afterprint', () => {
+  document.documentElement.style.setProperty('--print-scale', '1');
+});
+
+// ========================
+// 画像（PNG）で保存
+// ========================
+// PDFのほかに、LINE等でそのまま送りやすいPNG画像でも保存したいという要望に
+// 対応。印刷と同じ「.print-measure」の見た目（編集用ボタン等を隠し、文字も
+// 大きくしたもの）をそのまま撮影に使うことで、印刷用CSSをもう1セット作らずに
+// 済ませている。撮影にはhtml2canvas（初回のみCDNから読み込み）を使う。
+let html2canvasLoaded = false;
+async function loadHtml2Canvas() {
+  if (html2canvasLoaded || typeof html2canvas !== 'undefined') {
+    html2canvasLoaded = true;
+    return true;
+  }
+  return new Promise(resolve => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload = () => { html2canvasLoaded = true; resolve(true); };
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
+async function exportAsImage() {
+  const btn = document.getElementById('btn-image-export');
+  const origLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '🖼 作成中…'; }
+
+  try {
+    const ok = await loadHtml2Canvas();
+    if (!ok || typeof html2canvas === 'undefined') {
+      alert('画像化ライブラリの読み込みに失敗しました。インターネット接続を確認してください。');
+      return;
+    }
+
+    // (v3で修正) 以前はbodyの幅を画面のウィンドウ幅のまま撮影していたため、
+    // 画面が広いパソコンで撮影すると印刷/PDFとは違い横長の画像になってしまう
+    // 不具合があった。印刷時と同じくbodyの幅をA4印刷ページの実際の幅に固定し、
+    // 自動縮小（--print-scale）も同じロジックで計算したうえで撮影することで、
+    // 印刷/PDFと同じA4縦のレイアウトで画像化されるようにした。
+    const restoreLayout = applyPrintLayoutForCapture();
+    // html2canvasは明示的にwidth/windowWidthを渡さないと、bodyを固定した幅では
+    // なく実際のブラウザウィンドウの幅を基準にキャンバスを作ってしまい、
+    // 結果として画像の右側に余白ができて横長に見えてしまう。撮影に使う幅を
+    // A4縦の固定幅に明示的にそろえることで、この余白が出ないようにする。
+    const captureWidth = Math.round(restoreLayout.capturedWidthPx || document.body.getBoundingClientRect().width);
+
+    let canvas;
+    try {
+      canvas = await html2canvas(document.body, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        width: captureWidth,
+        windowWidth: captureWidth
+      });
+    } finally {
+      restoreLayout();
+      document.documentElement.style.setProperty('--print-scale', '1');
+    }
+
+    canvas.toBlob(blob => {
+      if (!blob) { alert('画像の作成に失敗しました。'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      a.href = url;
+      a.download = `花の会予定表_${currentYear}年${pad(currentMonth)}月_${pad(ts.getHours())}${pad(ts.getMinutes())}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  } catch (e) {
+    alert('画像の作成に失敗しました: ' + (e && e.message ? e.message : e));
+    document.body.classList.remove('print-measure');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origLabel || '🖼 画像で保存'; }
+  }
+}
+
+// ========================
+// Gemini 相談パネル（AI・スマホ対応版で追加）
+// ========================
+// このツールはサーバーを持たない単一HTMLファイルのため、Gemini APIキーは
+// このブラウザのlocalStorageにのみ保存する（ファイル自体には書き込まない）。
+// 提案されたスケジュールは必ずユーザーが「反映する」を押すまでカレンダーに
+// 反映されない（勝手に上書きしない）。
+const GEMINI_KEY_STORAGE = 'hananokai_gemini_api_key';
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_HISTORY_LIMIT = 24; // 会話が長くなりすぎないよう直近分だけ保持
+let geminiApiKey = null;
+let geminiChatHistory = []; // 会話本文のみ（役割ごとの生テキスト）。状態スナップショットは毎回別途付与する
+let geminiBusy = false;
+
+function loadGeminiApiKey() {
+  try { geminiApiKey = localStorage.getItem(GEMINI_KEY_STORAGE) || null; } catch(e) { geminiApiKey = null; }
+  updateGeminiKeyUI();
+}
+
+function updateGeminiKeyUI() {
+  const status = document.getElementById('gemini-key-status');
+  const badge = document.getElementById('gemini-fab-badge');
+  if (!status) return;
+  if (geminiApiKey) {
+    status.innerHTML = '<span class="gk-status">✅ APIキー設定済み</span>';
+    if (badge) badge.classList.remove('show');
+  } else {
+    status.textContent = 'APIキー未設定（相談するには設定が必要です）';
+    if (badge) badge.classList.add('show');
+  }
+}
+
+function promptGeminiApiKey() {
+  const current = geminiApiKey || '';
+  const input = prompt('Gemini APIキーを入力してください。\nGoogle AI Studio（aistudio.google.com）で無料取得できます。\nこのブラウザにのみ保存され、ファイルには保存されません。', current);
+  if (input === null) return;
+  const trimmed = input.trim();
+  if (!trimmed) {
+    try { localStorage.removeItem(GEMINI_KEY_STORAGE); } catch(e) {}
+    geminiApiKey = null;
+  } else {
+    try { localStorage.setItem(GEMINI_KEY_STORAGE, trimmed); } catch(e) {}
+    geminiApiKey = trimmed;
+  }
+  updateGeminiKeyUI();
+}
+
+function openGeminiDrawer() {
+  document.getElementById('gemini-drawer-overlay').classList.add('open');
+  const input = document.getElementById('gemini-input');
+  if (input) input.focus();
+}
+function closeGeminiDrawer() {
+  document.getElementById('gemini-drawer-overlay').classList.remove('open');
+}
+
+function handleGeminiInputKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendGeminiMessage();
+  }
+}
+
+function sendGeminiQuickPrompt(text) {
+  const input = document.getElementById('gemini-input');
+  input.value = text;
+  sendGeminiMessage();
+}
+
+function appendGeminiMsg(role, text) {
+  const log = document.getElementById('gemini-chat-log');
+  const div = document.createElement('div');
+  div.className = 'gemini-msg ' + role;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+// 現在の名簿・空き状況・配置状況をGeminiに渡すための状態スナップショットを作る。
+// 会話が続いても常に「今の」状態を渡すため、履歴には積まずリクエストの都度作り直す。
+function buildGeminiContext() {
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const lines = [];
+  lines.push(`【対象月】${currentYear}年${currentMonth}月（${daysInMonth}日まで）`);
+  lines.push(`【セッション制】${sessionMode === 1 ? '1回制（1日1枠）' : '2回制（午前・午後）'}`);
+  const wd = [...workDays].sort((a, b) => a - b);
+  lines.push(`【作業日】${wd.length ? wd.join('、') + '日' : '（作業日が未設定。全日を候補として扱ってください）'}`);
+
+  lines.push('');
+  lines.push('【メンバー一覧: id: 名前 / 午前可能日 / 午後可能日 / NG日 / ステータス】');
+  if (MEMBERS.length === 0) {
+    lines.push('（まだ登録されているメンバーがいません。まず名簿の登録が必要である旨を伝えてください）');
+  }
+  MEMBERS.forEach(m => {
+    const am = (m.availableAm || []).join(',') || 'なし';
+    const pm = (m.availablePm || []).join(',') || 'なし';
+    const ngAm = (m.unavailableAm || []).join(',');
+    const ngPm = (m.unavailablePm || []).join(',');
+    const ng = (ngAm || ngPm) ? ` / NG[午前:${ngAm || 'なし'} 午後:${ngPm || 'なし'}]` : '';
+    lines.push(`id=${m.id}: ${m.name} / 午前可[${am}] / 午後可[${pm}]${ng} / status=${m.status || '未設定'}`);
+  });
+
+  const counts = getParticipationCounts();
+  lines.push('');
+  lines.push('【現在の参加回数（多い/少ないの偏り確認用）】');
+  MEMBERS.forEach(m => lines.push(`${m.name}: ${counts[m.id] || 0}回`));
+
+  lines.push('');
+  lines.push('【現在の配置状況：空欄=未配置、🔒=ロック中で変更不可（提案しないこと）】');
+  for (let day = 1; day <= daysInMonth; day++) {
+    if (workDays.size > 0 && !workDays.has(day)) continue;
+    const parts = [];
+    if (sessionMode === 1) {
+      const am = getSlot(day, 'am');
+      const names = am.map(id => (getMember(id) || {}).name || id).join('、') || '（未配置）';
+      parts.push(`作業: ${names}${isLocked(day, 'am') ? '🔒' : ''}（目標${getTarget(day, 'am')}名）`);
+    } else {
+      if (disabledSlots[day] !== 'am') {
+        const am = getSlot(day, 'am');
+        const names = am.map(id => (getMember(id) || {}).name || id).join('、') || '（未配置）';
+        parts.push(`午前: ${names}${isLocked(day, 'am') ? '🔒' : ''}（目標${getTarget(day, 'am')}名）`);
+      }
+      if (disabledSlots[day] !== 'pm') {
+        const pm = getSlot(day, 'pm');
+        const names = pm.map(id => (getMember(id) || {}).name || id).join('、') || '（未配置）';
+        parts.push(`午後: ${names}${isLocked(day, 'pm') ? '🔒' : ''}（目標${getTarget(day, 'pm')}名）`);
+      }
+    }
+    lines.push(`${day}日 ${parts.join(' / ')}`);
+  }
+
+  return lines.join('\n');
+}
+
+const GEMINI_SYSTEM_INSTRUCTION = `あなたは「花の会」という団体の作業予定表づくりを手伝うアシスタントです。
+世話係の担当者からの質問・依頼に、日本語で簡潔・丁寧に答えてください。
+
+厳守ルール:
+1. あなたが提案・変更できるのは、渡された「メンバー一覧」に既にidが割り振られている人を、指定の日・枠（1回制なら'am'固定、2回制なら'am'または'pm'）に割り当てることだけです。名簿にない新しい人を勝手に作らないでください。
+2. 🔒（ロック中）と書かれている枠は変更を提案しないでください。
+3. メンバーが「可能」と回答していない日（午前可/午後可の一覧にない日）や、NGと回答した日には、その人を配置しないでください。
+4. 特定の人にだけ参加回数が偏りすぎないよう、できるだけ公平な配置を心がけてください。
+5. 「〇〇さんを△△さんに変えて」「15日の午後に1人追加して」のような、既にある配置への個別の修正依頼にも対応してください。ゼロから全部作り直すだけでなく、一部分だけのピンポイントな修正もこのツールの主な使い方です。
+6. 会話・質問への回答は自由に行ってください。ただし具体的な配置の変更を提案するときは、回答の最後に必ず次の形式のコードブロックを1つだけ付けてください（雑談や質問への回答のみで変更を提案しないときは付けないでください）。
+
+\`\`\`schedule-proposal
+{"changes":[{"day":15,"slot":"am","memberIds":[3,7]}],"note":"短い説明（任意）"}
+\`\`\`
+
+- 重要: memberIdsは「その枠に入る人全員」のid配列で、既存の配置を丸ごと置き換えます。部分修正のとき（例: 現在[A,C]のうちAだけをBに変える）は、変更しない人（C）のidも一緒に含めてください。C を書き忘れると C まで外れてしまいます。
+- 変更しない日・枠はchangesに含めないでください。
+- 1回制のときはslotは常に"am"にしてください。`;
+
+async function callGeminiApi(contents) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(geminiApiKey)}`;
+  const body = {
+    systemInstruction: { role: 'system', parts: [{ text: GEMINI_SYSTEM_INSTRUCTION }] },
+    contents
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    let detail = '';
+    try { const errJson = await res.json(); detail = (errJson.error && errJson.error.message) ? errJson.error.message : JSON.stringify(errJson); }
+    catch(e) { try { detail = await res.text(); } catch(e2) { detail = String(res.status); } }
+    throw new Error(`Gemini API エラー (${res.status}): ${detail}`);
+  }
+
+  const data = await res.json();
+  const candidate = data.candidates && data.candidates[0];
+  const text = candidate && candidate.content && candidate.content.parts
+    ? candidate.content.parts.map(p => p.text || '').join('')
+    : '';
+  if (!text) {
+    const reason = (candidate && candidate.finishReason) || (data.promptFeedback && data.promptFeedback.blockReason) || '不明';
+    throw new Error(`Geminiから応答が得られませんでした（reason: ${reason}）`);
+  }
+  return text;
+}
+
+function extractScheduleProposal(text) {
+  const m = text.match(/```schedule-proposal\s*([\s\S]*?)```/);
+  if (!m) return null;
+  try {
+    const parsed = JSON.parse(m[1].trim());
+    if (!parsed || !Array.isArray(parsed.changes)) return null;
+    return parsed;
+  } catch(e) {
+    return null;
+  }
+}
+
+function stripScheduleProposalBlock(text) {
+  return text.replace(/```schedule-proposal\s*[\s\S]*?```/, '').trim();
+}
+
+function renderGeminiProposal(proposal) {
+  const log = document.getElementById('gemini-chat-log');
+  const wrap = document.createElement('div');
+  wrap.className = 'gemini-proposal';
+  let html = '<h4>📋 提案されたスケジュール変更</h4>';
+  proposal.changes.forEach(ch => {
+    const names = (ch.memberIds || []).map(id => (getMember(id) || {}).name || `id:${id}`).join('、') || '（配置なし）';
+    const slotLabel = ch.slot === 'pm' ? '午後' : (sessionMode === 1 ? '' : '午前');
+    html += `<div class="gp-row">${ch.day}日 ${slotLabel}: ${names}</div>`;
+  });
+  if (proposal.note) html += `<div class="gp-row" style="border:none;color:#888;">${proposal.note}</div>`;
+  html += '<div class="gp-actions"><button class="gp-apply">✅ この内容で反映する</button><button class="gp-dismiss">見送る</button></div>';
+  wrap.innerHTML = html;
+  wrap.querySelector('.gp-apply').onclick = () => applyGeminiProposal(proposal, wrap);
+  wrap.querySelector('.gp-dismiss').onclick = () => { wrap.querySelector('.gp-actions').innerHTML = '<span style="color:#999;">見送りました</span>'; };
+  log.appendChild(wrap);
+  log.scrollTop = log.scrollHeight;
+}
+
+// 提案を実際のカレンダーに反映する。ロック中の枠・不正なidは安全のためスキップする。
+function applyGeminiProposal(proposal, wrapEl) {
+  const skippedLocked = [];
+  (proposal.changes || []).forEach(ch => {
+    const day = parseInt(ch.day, 10);
+    const slot = ch.slot === 'pm' ? 'pm' : 'am';
+    if (!day || day < 1) return;
+    if (isLocked(day, slot)) { skippedLocked.push(`${day}日${slot === 'pm' ? '午後' : '午前'}`); return; }
+    const ids = (ch.memberIds || []).filter(id => getMember(id));
+    setSlot(day, slot, ids);
+  });
+  render();
+  if (wrapEl) {
+    const actions = wrapEl.querySelector('.gp-actions');
+    let msg = '✅ 反映しました';
+    if (skippedLocked.length) msg += `（🔒のため反映しなかった枠: ${skippedLocked.join('、')}）`;
+    actions.innerHTML = `<span style="color:#2c5f2e;font-weight:bold;">${msg}</span>`;
+  }
+}
+
+async function sendGeminiMessage() {
+  if (geminiBusy) return;
+  const input = document.getElementById('gemini-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  if (!geminiApiKey) {
+    appendGeminiMsg('error', 'まずAPIキーを設定してください（上の「🔑 APIキーを設定」ボタン）。');
+    return;
+  }
+
+  appendGeminiMsg('user', text);
+  input.value = '';
+
+  geminiBusy = true;
+  const sendBtn = document.getElementById('gemini-send-btn');
+  sendBtn.disabled = true;
+  const log = document.getElementById('gemini-chat-log');
+  const thinking = document.createElement('div');
+  thinking.className = 'gemini-thinking';
+  thinking.textContent = 'Geminiが考えています…';
+  log.appendChild(thinking);
+  log.scrollTop = log.scrollHeight;
+
+  try {
+    const context = buildGeminiContext();
+    const augmentedText = `${context}\n\n【ユーザーからの質問・依頼】\n${text}`;
+    const contents = geminiChatHistory.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
+    contents.push({ role: 'user', parts: [{ text: augmentedText }] });
+
+    const replyText = await callGeminiApi(contents);
+
+    // 履歴には状態スナップショットを含まない素の会話文だけを積む（次回また最新状態を付与するため）
+    geminiChatHistory.push({ role: 'user', text });
+    geminiChatHistory.push({ role: 'model', text: replyText });
+    if (geminiChatHistory.length > GEMINI_HISTORY_LIMIT) {
+      geminiChatHistory = geminiChatHistory.slice(geminiChatHistory.length - GEMINI_HISTORY_LIMIT);
+    }
+
+    const proposal = extractScheduleProposal(replyText);
+    const displayText = proposal ? stripScheduleProposalBlock(replyText) : replyText;
+    if (displayText) appendGeminiMsg('model', displayText);
+    if (proposal && proposal.changes && proposal.changes.length) {
+      renderGeminiProposal(proposal);
+    }
+  } catch (e) {
+    appendGeminiMsg('error', '通信エラー: ' + (e && e.message ? e.message : e));
+  } finally {
+    thinking.remove();
+    geminiBusy = false;
+    sendBtn.disabled = false;
+  }
+}
+
+restoreStateOnLoad();
+render();
+updateWorkdayCount();
+updateSessionModeUI();
+loadGeminiApiKey();
+{
+  const noteInput = document.getElementById('month-note-input');
+  if (noteInput) noteInput.value = loadNotes('sessionMonthNote');
+}
+</script>
+</body>
+</html>
