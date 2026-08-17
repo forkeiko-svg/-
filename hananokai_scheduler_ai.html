@@ -3373,14 +3373,36 @@ async function exportAsImage() {
       document.documentElement.style.setProperty('--print-scale', '1');
     }
 
-    canvas.toBlob(blob => {
+    canvas.toBlob(async blob => {
       if (!blob) { alert('画像の作成に失敗しました。'); return; }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
       const ts = new Date();
       const pad = n => String(n).padStart(2, '0');
+      const filename = `花の会予定表_${currentYear}年${pad(currentMonth)}月_${pad(ts.getHours())}${pad(ts.getMinutes())}.png`;
+
+      // iPhone等では、単純なダウンロードだと「写真」アプリではなく
+      // ファイルアプリ等に保存されてしまい分かりにくいという声があったため、
+      // 対応している端末ではWeb Share APIでOSの共有シートを開き、
+      // 「画像を保存」を選べば直接カメラロール（写真）に保存できるようにする。
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: '花の会 作業予定表',
+          });
+          return;
+        } catch (shareErr) {
+          // ユーザーが共有をキャンセルした場合はそのまま何もしない。
+          // それ以外のエラーはダウンロード方式にフォールバックする。
+          if (shareErr && shareErr.name === 'AbortError') return;
+        }
+      }
+
+      // Web Share APIが使えない環境（PCのブラウザ等）向けのフォールバック。
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `花の会予定表_${currentYear}年${pad(currentMonth)}月_${pad(ts.getHours())}${pad(ts.getMinutes())}.png`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
