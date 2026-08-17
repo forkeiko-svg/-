@@ -397,6 +397,45 @@ body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Meiry
   .notices-section { margin: 6px 8px 8px; }
 }
 
+/* ===== スマホ（狭い画面）向け：カレンダーを7列表→1列の縦リストに変更 =====
+   7列のままだと1マスが小さくなりすぎてタップしづらいという声があったため、
+   スマホ幅では1日=1行のリスト形式にして、日付・曜日を大きく見やすくする。
+   PC・タブレット向けの7列レイアウトはそのまま残す。 */
+@media (max-width: 600px) {
+  .weekdays { display: none; }
+  .calendar-grid { grid-template-columns: 1fr; gap: 10px; }
+  .day-cell.empty-cell { display: none; }
+
+  .day-cell { padding: 12px 14px; border-radius: 12px; min-height: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .day-cell.today { border-width: 2px; }
+
+  .day-header { margin-bottom: 8px; }
+  .day-num { font-size: 22px; }
+  .day-num::after { font-size: 14px; font-weight: normal; margin-left: 8px; color: #888; }
+  .day-cell[data-dow="0"] .day-num::after { content: "（日）"; color: #c00; }
+  .day-cell[data-dow="1"] .day-num::after { content: "（月）"; }
+  .day-cell[data-dow="2"] .day-num::after { content: "（火）"; }
+  .day-cell[data-dow="3"] .day-num::after { content: "（水）"; }
+  .day-cell[data-dow="4"] .day-num::after { content: "（木）"; }
+  .day-cell[data-dow="5"] .day-num::after { content: "（金）"; }
+  .day-cell[data-dow="6"] .day-num::after { content: "（土）"; color: #2a5ba8; }
+  .day-toggle { font-size: 20px !important; padding: 4px 8px !important; }
+
+  .slot { padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; }
+  .slot-header { font-size: 14px; margin-bottom: 6px; }
+  .slot-label { font-size: 14px; }
+  .slot-info { font-size: 12px; }
+  .slot-lock { font-size: 16px; }
+  .members-row { min-height: 42px; gap: 8px; }
+
+  .chip { font-size: 17px; padding: 9px 12px 9px 14px; min-height: 40px; border-radius: 20px; }
+  .chip .remove { font-size: 20px; }
+  .add-slot-btn { padding: 9px 14px; font-size: 15px; min-height: 40px; border-radius: 12px; }
+
+  /* 日付ジャンプしやすいよう、月移動の下に現在の月を大きく表示 */
+  .month-nav input[type="month"] { font-size: 15px; padding: 6px 10px; }
+}
+
 /* ===== Gemini 相談パネル（フローティングボタン＋ドロワー） ===== */
 .gemini-fab {
   position: fixed; right: 18px; bottom: 18px; z-index: 500;
@@ -1126,6 +1165,7 @@ function renderCalendar() {
 
     html += `<div class="${classNames.join(' ')}"
       data-day="${day}"
+      data-dow="${dow}"
       ondragover="handleDayCellDragOver(event)"
       ondrop="handleDayCellDrop(event)"
       ondragleave="handleDayCellDragLeave(event)">`;
